@@ -851,8 +851,9 @@ async function initDetector() {
   return faceLandmarksDetection.createDetector(
     faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh,
     {
-      runtime: 'tfjs',
-      refineLandmarks: true
+      runtime: 'mediapipe',
+      refineLandmarks: true,
+      solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619'
     }
   );
 }
