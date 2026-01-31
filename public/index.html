@@ -18,30 +18,36 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <main class="screen">
-      <header class="header">
+    <a href="#startBtn" class="skip-link">Skip to main content</a>
+    <main class="screen" role="main">
+      <header class="header" role="banner">
         <h1>MAINTAIN</h1>
         <p class="subtitle">Behavioural Compliance Assessment</p>
-        <p class="meta">MANDATORY | SESSION ACTIVE</p>
-        <button id="fullscreenBtn" class="fullscreen-btn" title="Toggle Fullscreen">⛶</button>
+        <p class="meta" aria-live="polite">MANDATORY | SESSION ACTIVE</p>
       </header>
 
       <div class="main-content">
         <!-- Left: Video Area -->
-        <section class="panel video-panel">
-          <div class="video-area">
-            <video id="video" autoplay playsinline muted></video>
-            <canvas id="overlay"></canvas>
-            <div id="status" class="status">Idle</div>
-            <div id="notice" class="notice hidden"></div>
-            <div id="badge" class="badge hidden">!</div>
-            <div id="veil" class="veil hidden"></div>
-            <div id="cursor" class="cursor hidden"></div>
+        <section class="panel video-panel" aria-label="Video feed and game area">
+          <div class="video-area" role="img" aria-label="Webcam video feed with face tracking overlay">
+            <video id="video" autoplay playsinline muted aria-hidden="true"></video>
+            <canvas id="overlay" aria-hidden="true"></canvas>
+            <!-- TV noise overlay for idle state -->
+            <canvas id="noiseCanvas" class="noise-canvas hidden" aria-hidden="true"></canvas>
+            <!-- Scan lines overlay -->
+            <div id="scanLines" class="scan-lines hidden" aria-hidden="true"></div>
+            <!-- Smile feedback overlay -->
+            <div id="smileFeedback" class="smile-feedback hidden" role="alert" aria-live="polite"></div>
+            <div id="status" class="status" role="status" aria-live="polite">Idle</div>
+            <div id="notice" class="notice hidden" role="alert" aria-live="assertive"></div>
+            <div id="badge" class="badge hidden" aria-hidden="true">!</div>
+            <div id="veil" class="veil hidden" aria-hidden="true"></div>
+            <div id="cursor" class="cursor hidden" aria-hidden="true"></div>
             <!-- Loading overlay -->
-            <div id="loadingOverlay" class="loading-overlay hidden">
+            <div id="loadingOverlay" class="loading-overlay hidden" role="dialog" aria-label="Loading">
               <div class="loading-content">
-                <div id="loadingText" class="loading-text">Initializing...</div>
-                <div id="countdownDisplay" class="countdown-display hidden">3</div>
+                <div id="loadingText" class="loading-text" aria-live="polite">Initializing...</div>
+                <div id="countdownDisplay" class="countdown-display hidden" aria-live="assertive">3</div>
               </div>
             </div>
           </div>
@@ -51,37 +57,48 @@
         </section>
 
         <!-- Right: Sidebar -->
-        <aside class="sidebar">
+        <aside class="sidebar" role="complementary" aria-label="Game controls and leaderboard">
           <div class="sidebar-section">
-            <div id="timer" class="timer">00:00.000</div>
-            <button id="startBtn">Begin Assessment [Space]</button>
+            <div id="timer" class="timer" role="timer" aria-label="Elapsed time">00:00.000</div>
+            <button id="startBtn" aria-describedby="startHelp">Begin Assessment [Space]</button>
+            <span id="startHelp" class="sr-only">Press Space or click to start the assessment</span>
           </div>
 
-          <div class="sidebar-section instructions">
+          <div class="sidebar-section instructions" role="region" aria-label="Instructions">
             <h2>Protocol</h2>
             <ul>
               <li>Eyes in zone. Expression appropriate. Expectations may change.</li>
             </ul>
           </div>
 
-          <div id="prompt" class="prompt"></div>
+          <div id="prompt" class="prompt" role="status" aria-live="polite"></div>
 
           <!-- Debug tracking values -->
-          <div id="debugPanel" class="debug-panel hidden">
+          <div id="debugPanel" class="debug-panel hidden" role="region" aria-label="Tracking metrics">
             <h3>Tracking</h3>
             <div id="debugValues" class="debug-values"></div>
           </div>
 
-          <div class="sidebar-section leaderboard">
+          <div class="sidebar-section leaderboard" role="region" aria-label="Leaderboard">
             <div class="score-entry hidden" id="scoreEntry">
               <label for="playerName">Subject Identifier</label>
-              <input id="playerName" maxlength="24" placeholder="SUBJECT" />
+              <input id="playerName" maxlength="24" placeholder="SUBJECT" aria-describedby="nameHelp" />
+              <span id="nameHelp" class="sr-only">Enter your name (2-24 characters)</span>
               <button id="submitScore">Submit Record</button>
             </div>
             <h2>Compliance Leaderboard</h2>
-            <ol id="scores"></ol>
+            <div class="scores-container">
+              <ol id="scores" role="list" aria-label="Top scores"></ol>
+            </div>
           </div>
         </aside>
+      </div>
+
+      <!-- Media controls (bottom right) - music controls hidden until music file detected -->
+      <div id="mediaControls" class="media-controls" role="group" aria-label="Media controls">
+        <button id="musicToggle" class="media-btn music-control hidden" title="Play Music" aria-label="Toggle background music" aria-pressed="false" tabindex="0">♪</button>
+        <input type="range" id="volumeSlider" class="volume-slider music-control hidden" min="0" max="1" step="0.1" value="0.3" aria-label="Music volume" title="Volume" />
+        <button id="fullscreenBtn" class="media-btn" title="Toggle Fullscreen" aria-label="Toggle fullscreen mode" tabindex="0">⛶</button>
       </div>
 
     </main>
