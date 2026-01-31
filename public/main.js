@@ -2,6 +2,9 @@ const video = document.getElementById('video');
 const canvas = document.getElementById('overlay');
 const statusLabel = document.getElementById('status');
 const notice = document.getElementById('notice');
+const badge = document.getElementById('badge');
+const veil = document.getElementById('veil');
+const cursor = document.getElementById('cursor');
 const startBtn = document.getElementById('startBtn');
 const timerLabel = document.getElementById('timer');
 const promptLabel = document.getElementById('prompt');
@@ -21,10 +24,13 @@ const state = {
   livenessDrift: 0,
   blinkDrift: 0,
   lastBlinkTime: 0,
+  gazeAwayMs: 0,
+  eyesClosedMs: 0,
   movementSamples: [],
   lastPoints: null,
   processing: false,
-  distractions: null
+  distractions: null,
+  distractionLevel: 0
 };
 
 const prompts = [
@@ -38,8 +44,11 @@ const notices = [
   'PAYMENT OVERDUE',
   'NEW MESSAGE',
   'CALENDAR UPDATE',
-  'SYSTEM ALERT'
+  'SYSTEM ALERT',
+  'SESSION WARNING'
 ];
+
+const badges = ['1', '2', '3', '5', '!', '?'];
 
 function setStatus(text) {
   statusLabel.textContent = text;
@@ -86,11 +95,50 @@ function showNotice() {
   setTimeout(() => notice.classList.add('hidden'), 1200);
 }
 
+function showBadge() {
+  badge.textContent = badges[Math.floor(Math.random() * badges.length)];
+  badge.classList.remove('hidden');
+  setTimeout(() => badge.classList.add('hidden'), 900);
+}
+
+function showVeil() {
+  veil.classList.remove('hidden');
+  veil.classList.remove('show');
+  void veil.offsetWidth;
+  veil.classList.add('show');
+  setTimeout(() => veil.classList.add('hidden'), 1400);
+}
+
+function showCursor() {
+  const x = Math.random() * 70 + 15;
+  const y = Math.random() * 60 + 20;
+  cursor.style.left = `${x}%`;
+  cursor.style.top = `${y}%`;
+  cursor.classList.remove('hidden');
+  setTimeout(() => cursor.classList.add('hidden'), 700);
+}
+
+function triggerDistraction() {
+  const options = [showNotice, showBadge, showVeil, showCursor];
+  const pick = options[Math.floor(Math.random() * options.length)];
+  pick();
+}
+
 function scheduleDistractions() {
   if (state.distractions) {
-    clearInterval(state.distractions);
+    clearTimeout(state.distractions);
   }
-  state.distractions = setInterval(showNotice, 4500);
+  if (state.phase !== 'running' && state.phase !== 'calibrating') {
+    return;
+  }
+  const interval = Math.max(2200, 4600 - state.distractionLevel * 260);
+  state.distractionLevel = Math.min(8, state.distractionLevel + 1);
+  state.distractions = setTimeout(() => {
+    if (state.phase === 'running') {
+      triggerDistraction();
+    }
+    scheduleDistractions();
+  }, interval);
 }
 
 function resetMetrics(now) {
@@ -99,8 +147,11 @@ function resetMetrics(now) {
   state.livenessDrift = 0;
   state.blinkDrift = 0;
   state.lastBlinkTime = now;
+  state.gazeAwayMs = 0;
+  state.eyesClosedMs = 0;
   state.movementSamples = [];
   state.lastPoints = null;
+  state.distractionLevel = 0;
 }
 
 async function initDetector() {
@@ -119,13 +170,17 @@ async function startGame() {
   startBtn.disabled = true;
   setStatus('Requesting webcam');
   setPrompt('');
+  timerLabel.textContent = formatTime(0);
 
-  const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-  video.srcObject = stream;
+  if (!video.srcObject) {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    video.srcObject = stream;
+  }
 
   await new Promise((resolve) => {
     video.onloadedmetadata = () => resolve();
   });
+  await video.play();
 
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
@@ -187,15 +242,10 @@ function updateMovement(now, nose, leftEye, rightEye, width) {
   return state.movementSamples.reduce((sum, sample) => sum + sample.value, 0);
 }
 
-function updateBlink(now, leftUpper, leftLower, rightUpper, rightLower, width) {
+function getEyeOpenness(leftUpper, leftLower, rightUpper, rightLower, width) {
   const leftOpen = distance(leftUpper, leftLower) / width;
   const rightOpen = distance(rightUpper, rightLower) / width;
-  const openness = (leftOpen + rightOpen) / 2;
-
-  const closed = openness < 0.015;
-  if (closed && now - state.lastBlinkTime > 180) {
-    state.lastBlinkTime = now;
-  }
+  return (leftOpen + rightOpen) / 2;
 }
 
 function failRun(message) {
@@ -206,8 +256,10 @@ function failRun(message) {
     video.pause();
   }
   if (state.distractions) {
-    clearInterval(state.distractions);
+    clearTimeout(state.distractions);
   }
+  startBtn.disabled = false;
+  startBtn.textContent = 'Retry';
   scoreEntry.classList.remove('hidden');
   submitScore.disabled = false;
 }
@@ -275,8 +327,10 @@ async function loop(now) {
 
   if (inZone) {
     state.eyeDrift = Math.max(0, state.eyeDrift - dt / 600);
+    state.gazeAwayMs = Math.max(0, state.gazeAwayMs - dt * 1.4);
   } else {
     state.eyeDrift += dt / 800;
+    state.gazeAwayMs += dt;
   }
 
   const mouthWidth = distance(mouthLeft, mouthRight);
@@ -296,7 +350,15 @@ async function loop(now) {
     state.livenessDrift = Math.max(0, state.livenessDrift - dt / 600);
   }
 
-  updateBlink(now, leftUpper, leftLower, rightUpper, rightLower, width);
+  const eyeOpenness = getEyeOpenness(leftUpper, leftLower, rightUpper, rightLower, width);
+  const eyesClosed = eyeOpenness < 0.015;
+  if (eyesClosed) {
+    state.lastBlinkTime = now;
+    state.eyesClosedMs += dt;
+  } else {
+    state.eyesClosedMs = Math.max(0, state.eyesClosedMs - dt * 2);
+  }
+
   if (now - state.lastBlinkTime > 15000) {
     state.blinkDrift += dt / 2000;
   } else {
@@ -308,12 +370,20 @@ async function loop(now) {
       failRun('Eye contact was interrupted.');
       return;
     }
+    if (state.gazeAwayMs > 700) {
+      failRun('Looking away exceeded the limit.');
+      return;
+    }
     if (state.smileDrift > 1) {
       failRun('Expression was insufficient.');
       return;
     }
     if (state.livenessDrift > 1) {
       failRun('Presence degraded.');
+      return;
+    }
+    if (state.eyesClosedMs > 700) {
+      failRun('Blink duration exceeded the limit.');
       return;
     }
     if (state.blinkDrift > 1) {
@@ -360,7 +430,10 @@ async function submitScoreEntry() {
 }
 
 startBtn.addEventListener('click', () => {
-  if (state.phase === 'idle') {
+  if (state.phase === 'idle' || state.phase === 'failed') {
+    scoreEntry.classList.add('hidden');
+    submitScore.disabled = false;
+    startBtn.textContent = 'Start';
     startGame();
   }
 });

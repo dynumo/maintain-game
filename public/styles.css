@@ -1,8 +1,8 @@
 :root {
   color-scheme: dark;
   font-family: "Inter", system-ui, sans-serif;
-  background: #0b0b0f;
-  color: #e3e3e3;
+  background: #071627;
+  color: #f5f7ff;
 }
 
 * {
@@ -16,6 +16,7 @@ body {
   justify-content: center;
   align-items: center;
   padding: 32px;
+  background: radial-gradient(circle at top, #0b2b4a 0%, #071627 55%, #040b14 100%);
 }
 
 .screen {
@@ -33,24 +34,33 @@ body {
 
 .subtitle {
   margin: 4px 0 0;
-  color: #9c9caa;
+  color: #b7cff3;
+}
+
+.meta {
+  margin: 6px 0 0;
+  color: #f2d35c;
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .panel {
-  background: #13131a;
-  border: 1px solid #242435;
+  background: #0d2038;
+  border: 1px solid #1b3a5f;
   padding: 20px;
   border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(2, 10, 22, 0.4);
 }
 
 .video-area {
   position: relative;
   width: 100%;
   aspect-ratio: 16 / 9;
-  background: #050507;
+  background: #040a12;
   border-radius: 12px;
   overflow: hidden;
-  border: 1px solid #2a2a3e;
+  border: 1px solid #234c7a;
 }
 
 video,
@@ -71,8 +81,8 @@ video,
   top: 12px;
   left: 12px;
   padding: 6px 12px;
-  background: rgba(0, 0, 0, 0.6);
-  border: 1px solid #2b2b3f;
+  background: rgba(6, 16, 30, 0.75);
+  border: 1px solid #3a6a9c;
   font-size: 0.85rem;
 }
 
@@ -81,11 +91,12 @@ video,
   bottom: 12px;
   right: 12px;
   padding: 8px 12px;
-  background: #1b1220;
-  border: 1px solid #5e3b63;
+  background: rgba(20, 15, 40, 0.85);
+  border: 1px solid #f2d35c;
   font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+  color: #f5f7ff;
 }
 
 .notice.hidden {
@@ -100,14 +111,38 @@ video,
 
 .privacy {
   margin: 0;
-  color: #8d8da0;
+  color: #c1d4ee;
   font-size: 0.9rem;
 }
 
+.instructions {
+  border: 1px solid #2b537f;
+  border-radius: 10px;
+  padding: 12px;
+  background: rgba(6, 18, 34, 0.65);
+}
+
+.instructions h2 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+  color: #f2d35c;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.instructions ul {
+  margin: 0;
+  padding-left: 18px;
+  color: #e6eeff;
+  display: grid;
+  gap: 6px;
+  font-size: 0.95rem;
+}
+
 button {
-  background: #1f1f2b;
-  color: #e3e3e3;
-  border: 1px solid #3a3a52;
+  background: #143a63;
+  color: #f5f7ff;
+  border: 1px solid #3f76a8;
   padding: 10px 16px;
   border-radius: 8px;
   cursor: pointer;
@@ -122,10 +157,11 @@ button:disabled {
 .timer {
   font-size: 1.6rem;
   letter-spacing: 0.08em;
+  color: #f2d35c;
 }
 
 .prompt {
-  color: #c0c0d4;
+  color: #e6eeff;
   min-height: 1.2rem;
 }
 
@@ -148,9 +184,9 @@ button:disabled {
 #playerName {
   padding: 10px;
   border-radius: 8px;
-  border: 1px solid #2d2d45;
-  background: #0f0f16;
-  color: #e3e3e3;
+  border: 1px solid #2b537f;
+  background: #09182b;
+  color: #f5f7ff;
 }
 
 ol {
@@ -161,5 +197,67 @@ ol {
 }
 
 li {
-  color: #b9b9cc;
+  color: #d6e4ff;
+}
+
+.badge {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #f2d35c;
+  color: #1a1d22;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  box-shadow: 0 0 12px rgba(242, 211, 92, 0.6);
+}
+
+.badge.hidden {
+  display: none;
+}
+
+.veil {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, rgba(10, 30, 60, 0.2), rgba(242, 211, 92, 0.15));
+  backdrop-filter: blur(2px);
+  opacity: 0;
+}
+
+.veil.show {
+  animation: veil-slide 1.4s ease-in-out;
+}
+
+@keyframes veil-slide {
+  0% {
+    opacity: 0;
+    transform: translateX(-20%);
+  }
+  30% {
+    opacity: 0.45;
+  }
+  70% {
+    opacity: 0.45;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(20%);
+  }
+}
+
+.cursor {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid #f2d35c;
+  box-shadow: 0 0 8px rgba(242, 211, 92, 0.5);
+  pointer-events: none;
+}
+
+.cursor.hidden {
+  display: none;
 }
