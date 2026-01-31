@@ -96,17 +96,25 @@ body {
   border: 1px solid #1a2530;
 }
 
-video,
+video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* Mirror video for natural selfie view */
+  transform: scaleX(-1);
+}
+
 #overlay {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
-}
-
-#overlay {
   pointer-events: none;
+  /* Mirror canvas to match video */
+  transform: scaleX(-1);
 }
 
 .status {
