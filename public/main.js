@@ -445,7 +445,10 @@ const state = {
   currentDebugData: null,
   // Frame counting for debug
   frameCount: 0,
-  faceDetectionCount: 0
+  faceDetectionCount: 0,
+  // Detection settings discovered during warmup
+  useCanvasInput: false,
+  useFlipHorizontal: false
 };
 
 function getRandomMessage(category) {
@@ -848,13 +851,33 @@ async function initDetector() {
   await tf.setBackend('webgl');
   await tf.ready();
   log('DETECTOR', 'TensorFlow ready, creating face detector...');
-  return faceLandmarksDetection.createDetector(
-    faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh,
-    {
-      runtime: 'tfjs',
-      refineLandmarks: true
-    }
-  );
+
+  // Try to create detector with different configurations
+  try {
+    const detector = await faceLandmarksDetection.createDetector(
+      faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh,
+      {
+        runtime: 'tfjs',
+        refineLandmarks: true,
+        maxFaces: 1
+      }
+    );
+    log('DETECTOR', 'MediaPipeFaceMesh detector created');
+    return detector;
+  } catch (err) {
+    log('ERROR', 'Failed to create MediaPipeFaceMesh detector', { error: err.message });
+    throw err;
+  }
+}
+
+// Helper to get detection input - use canvas for more reliable detection
+function getDetectionInput() {
+  const tempCanvas = document.createElement('canvas');
+  tempCanvas.width = video.videoWidth;
+  tempCanvas.height = video.videoHeight;
+  const tempCtx = tempCanvas.getContext('2d');
+  tempCtx.drawImage(video, 0, 0);
+  return tempCanvas;
 }
 
 // Show loading overlay
@@ -1045,33 +1068,43 @@ async function startGame() {
   let warmupFaces = [];
   let useFlipHorizontal = false;
 
-  for (let attempt = 1; attempt <= 5; attempt++) {
-    try {
-      // Alternate between flip settings
-      const flip = attempt <= 2 ? false : attempt <= 4 ? true : false;
-      log('DETECTOR', `Warmup detection attempt ${attempt}/5 (flip=${flip})...`);
-      const warmupStart = performance.now();
-      warmupFaces = await state.detector.estimateFaces(video, { flipHorizontal: flip });
-      const warmupTime = performance.now() - warmupStart;
-      log('DETECTOR', `Warmup attempt ${attempt} complete in ${warmupTime.toFixed(0)}ms`, {
-        facesFound: warmupFaces.length,
-        flipHorizontal: flip
-      });
+  // Try detection with both video element and canvas, with different flip settings
+  const inputMethods = ['video', 'canvas'];
+  const flipSettings = [false, true];
 
-      if (warmupFaces.length > 0) {
-        useFlipHorizontal = flip;
-        log('DETECTOR', 'Face found during warmup!', {
-          box: warmupFaces[0].box,
-          keypointsCount: warmupFaces[0].keypoints?.length,
+  outerLoop:
+  for (const inputMethod of inputMethods) {
+    for (const flip of flipSettings) {
+      const attemptNum = inputMethods.indexOf(inputMethod) * 2 + flipSettings.indexOf(flip) + 1;
+      try {
+        const input = inputMethod === 'canvas' ? getDetectionInput() : video;
+        log('DETECTOR', `Warmup attempt ${attemptNum}/4 (input=${inputMethod}, flip=${flip})...`);
+        const warmupStart = performance.now();
+        warmupFaces = await state.detector.estimateFaces(input, { flipHorizontal: flip });
+        const warmupTime = performance.now() - warmupStart;
+        log('DETECTOR', `Warmup attempt ${attemptNum} complete in ${warmupTime.toFixed(0)}ms`, {
+          facesFound: warmupFaces.length,
+          inputMethod,
           flipHorizontal: flip
         });
-        break;
-      }
 
-      // Wait before retry
-      await new Promise(r => setTimeout(r, 300));
-    } catch (err) {
-      log('ERROR', `Warmup attempt ${attempt} failed`, { name: err.name, message: err.message });
+        if (warmupFaces.length > 0) {
+          useFlipHorizontal = flip;
+          state.useCanvasInput = inputMethod === 'canvas';
+          log('DETECTOR', 'Face found during warmup!', {
+            box: warmupFaces[0].box,
+            keypointsCount: warmupFaces[0].keypoints?.length,
+            inputMethod,
+            flipHorizontal: flip
+          });
+          break outerLoop;
+        }
+
+        // Wait before retry
+        await new Promise(r => setTimeout(r, 200));
+      } catch (err) {
+        log('ERROR', `Warmup attempt ${attemptNum} failed`, { name: err.name, message: err.message });
+      }
     }
   }
 
@@ -1275,7 +1308,9 @@ async function loop(now) {
 
   let faces;
   try {
-    faces = await state.detector.estimateFaces(video, { flipHorizontal: state.useFlipHorizontal || false });
+    // Use canvas input if that's what worked during warmup
+    const input = state.useCanvasInput ? getDetectionInput() : video;
+    faces = await state.detector.estimateFaces(input, { flipHorizontal: state.useFlipHorizontal || false });
     state.faceDetectionCount++;
   } catch (err) {
     log('ERROR', 'Face detection error', { name: err.name, message: err.message });
