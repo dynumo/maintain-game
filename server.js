@@ -1,14 +1,21 @@
 const express = require('express');
 const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
+const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const DB_PATH = path.join(__dirname, 'data', 'leaderboard.db');
+const DATA_DIR = path.join(__dirname, 'data');
+const DB_PATH = path.join(DATA_DIR, 'leaderboard.db');
 const MAX_TIME_MS = 10 * 60 * 1000;
 const MIN_NAME_LENGTH = 2;
 const MAX_NAME_LENGTH = 24;
 const RATE_LIMIT_MS = 2000;
+
+// Ensure data directory exists
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+}
 
 const db = new sqlite3.Database(DB_PATH);
 
