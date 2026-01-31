@@ -1192,6 +1192,14 @@ startBtn.addEventListener('keydown', (e) => {
   }
 });
 
+// Global keyboard shortcut - Space to start/retry
+document.addEventListener('keydown', (e) => {
+  if (e.key === ' ' && document.activeElement !== playerName) {
+    e.preventDefault();
+    handleStart();
+  }
+});
+
 submitScore.addEventListener('click', submitScoreEntry);
 
 playerName.addEventListener('keydown', (e) => {
