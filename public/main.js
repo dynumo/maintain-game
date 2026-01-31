@@ -1721,6 +1721,33 @@ window.addEventListener('beforeunload', () => {
   }
 });
 
+// Fullscreen toggle
+const fullscreenBtn = document.getElementById('fullscreenBtn');
+if (fullscreenBtn) {
+  fullscreenBtn.addEventListener('click', () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch((err) => {
+        console.error('Error attempting to enable fullscreen:', err);
+      });
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
+    }
+  });
+
+  // Update button text based on fullscreen state
+  document.addEventListener('fullscreenchange', () => {
+    if (document.fullscreenElement) {
+      fullscreenBtn.textContent = '⛶';
+      fullscreenBtn.title = 'Exit Fullscreen';
+    } else {
+      fullscreenBtn.textContent = '⛶';
+      fullscreenBtn.title = 'Enter Fullscreen';
+    }
+  });
+}
+
 log('INIT', 'Game initialized');
 fetchScores();
 setPrompt('Awaiting subject.');
