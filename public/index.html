@@ -3,15 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Maintain</title>
+    <title>MAINTAIN — Behavioural Compliance Assessment</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <main class="screen">
       <header class="header">
-        <h1>Maintain</h1>
-        <p class="subtitle">Remain present.</p>
-        <p class="meta">Concept: autistic masking.</p>
+        <h1>MAINTAIN</h1>
+        <p class="subtitle">Behavioural Compliance Assessment</p>
+        <p class="meta">MANDATORY | SESSION ACTIVE</p>
       </header>
 
       <section class="panel">
@@ -27,17 +27,18 @@
 
         <div class="controls">
           <p class="privacy">
-            Webcam processing happens entirely in your browser. No video or images are uploaded or stored.
+            Webcam processing occurs entirely in your browser. No video or images are uploaded or stored.
           </p>
           <div class="instructions">
-            <h2>Instructions</h2>
+            <h2>Assessment Protocol</h2>
             <ul>
-              <li>Keep your eyes inside the center box.</li>
-              <li>Maintain a visible smile.</li>
-              <li>Looking away or holding a blink for 0.7s ends the run.</li>
+              <li>Maintain visual attention within the designated zone.</li>
+              <li>Display appropriate expression levels at all times.</li>
+              <li>Deviation from expected behaviour will be recorded.</li>
+              <li>The system's expectations may change without notice.</li>
             </ul>
           </div>
-          <button id="startBtn">Start</button>
+          <button id="startBtn">Begin Assessment</button>
           <div id="timer" class="timer">00:00.000</div>
           <div id="prompt" class="prompt"></div>
         </div>
@@ -45,13 +46,17 @@
 
       <section class="panel leaderboard">
         <div class="score-entry hidden" id="scoreEntry">
-          <label for="playerName">Name</label>
-          <input id="playerName" maxlength="24" placeholder="SYSTEM" />
-          <button id="submitScore">Submit</button>
+          <label for="playerName">Subject Identifier</label>
+          <input id="playerName" maxlength="24" placeholder="SUBJECT" />
+          <button id="submitScore">Submit Record</button>
         </div>
-        <h2>Leaderboard</h2>
+        <h2>Compliance Records</h2>
         <ol id="scores"></ol>
       </section>
+
+      <footer class="footer">
+        <p>This assessment is mandatory. Your cooperation is expected.</p>
+      </footer>
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>

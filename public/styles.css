@@ -1,8 +1,8 @@
 :root {
   color-scheme: dark;
-  font-family: "Inter", system-ui, sans-serif;
-  background: #071627;
-  color: #f5f7ff;
+  font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+  background: #050a10;
+  color: #c8d0dc;
 }
 
 * {
@@ -16,51 +16,56 @@ body {
   justify-content: center;
   align-items: center;
   padding: 32px;
-  background: radial-gradient(circle at top, #0b2b4a 0%, #071627 55%, #040b14 100%);
+  background: linear-gradient(180deg, #080d14 0%, #050a10 50%, #030508 100%);
 }
 
 .screen {
   width: min(1100px, 100%);
   display: grid;
-  gap: 24px;
+  gap: 20px;
 }
 
 .header h1 {
   margin: 0;
-  font-size: 2.5rem;
-  letter-spacing: 0.08em;
+  font-size: 2.2rem;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
+  font-weight: 600;
+  color: #e8eef6;
 }
 
 .subtitle {
   margin: 4px 0 0;
-  color: #b7cff3;
+  color: #8a9aac;
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
 }
 
 .meta {
-  margin: 6px 0 0;
-  color: #f2d35c;
-  font-size: 0.95rem;
-  letter-spacing: 0.04em;
+  margin: 8px 0 0;
+  color: #c49a4a;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
+  font-weight: 500;
 }
 
 .panel {
-  background: #0d2038;
-  border: 1px solid #1b3a5f;
+  background: #0a1018;
+  border: 1px solid #1a2530;
   padding: 20px;
-  border-radius: 12px;
-  box-shadow: 0 12px 32px rgba(2, 10, 22, 0.4);
+  border-radius: 4px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
 }
 
 .video-area {
   position: relative;
   width: 100%;
   aspect-ratio: 16 / 9;
-  background: #040a12;
-  border-radius: 12px;
+  background: #030508;
+  border-radius: 2px;
   overflow: hidden;
-  border: 1px solid #234c7a;
+  border: 1px solid #1a2530;
 }
 
 video,
@@ -78,33 +83,31 @@ video,
 
 .status {
   position: absolute;
-  top: 12px;
-  left: 12px;
-  padding: 6px 12px;
-  background: rgba(6, 16, 30, 0.85);
-  border: 1px solid #3a6a9c;
-  font-size: 0.85rem;
-  border-radius: 4px;
-  transition: background 0.2s, border-color 0.2s;
-}
-
-/* Pulse animation for loading/calibrating states */
-@keyframes status-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
+  top: 10px;
+  left: 10px;
+  padding: 5px 10px;
+  background: rgba(5, 10, 16, 0.9);
+  border: 1px solid #2a3a4a;
+  font-size: 0.75rem;
+  border-radius: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #8a9aac;
 }
 
 .notice {
   position: absolute;
   bottom: 12px;
   right: 12px;
-  padding: 8px 12px;
-  background: rgba(20, 15, 40, 0.85);
-  border: 1px solid #f2d35c;
-  font-size: 0.85rem;
+  padding: 8px 14px;
+  background: rgba(10, 16, 24, 0.95);
+  border: 1px solid #c49a4a;
+  font-size: 0.8rem;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #f5f7ff;
+  letter-spacing: 0.06em;
+  color: #c49a4a;
+  font-weight: 500;
+  z-index: 10;
 }
 
 .notice.hidden {
@@ -112,81 +115,93 @@ video,
 }
 
 .controls {
-  margin-top: 18px;
+  margin-top: 16px;
   display: grid;
   gap: 12px;
 }
 
 .privacy {
   margin: 0;
-  color: #c1d4ee;
-  font-size: 0.9rem;
+  color: #6a7a8a;
+  font-size: 0.8rem;
+  font-style: italic;
 }
 
 .instructions {
-  border: 1px solid #2b537f;
-  border-radius: 10px;
+  border: 1px solid #1a2530;
+  border-radius: 2px;
   padding: 12px;
-  background: rgba(6, 18, 34, 0.65);
+  background: rgba(5, 10, 16, 0.5);
 }
 
 .instructions h2 {
   margin: 0 0 8px;
-  font-size: 1rem;
-  color: #f2d35c;
+  font-size: 0.85rem;
+  color: #8a9aac;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  font-weight: 500;
 }
 
 .instructions ul {
   margin: 0;
   padding-left: 18px;
-  color: #e6eeff;
+  color: #a0aab8;
   display: grid;
-  gap: 6px;
-  font-size: 0.95rem;
+  gap: 4px;
+  font-size: 0.85rem;
+}
+
+.instructions li {
+  color: #a0aab8;
 }
 
 button {
-  background: #143a63;
-  color: #f5f7ff;
-  border: 1px solid #3f76a8;
+  background: #12202e;
+  color: #c8d0dc;
+  border: 1px solid #2a3a4a;
   padding: 10px 16px;
-  border-radius: 8px;
+  border-radius: 2px;
   cursor: pointer;
-  font-size: 1rem;
-  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 500;
+  transition: background 0.15s, border-color 0.15s;
 }
 
 button:hover:not(:disabled) {
-  background: #1a4a7a;
-  border-color: #5096c8;
+  background: #1a2a3a;
+  border-color: #3a4a5a;
 }
 
 button:focus {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(79, 150, 200, 0.5);
+  box-shadow: 0 0 0 2px rgba(196, 154, 74, 0.3);
 }
 
 button:focus-visible {
-  outline: 2px solid #5096c8;
-  outline-offset: 2px;
+  outline: 1px solid #c49a4a;
+  outline-offset: 1px;
 }
 
 button:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
 .timer {
-  font-size: 1.6rem;
-  letter-spacing: 0.08em;
-  color: #f2d35c;
+  font-size: 1.5rem;
+  letter-spacing: 0.1em;
+  color: #c49a4a;
+  font-family: "Consolas", "Monaco", monospace;
+  font-weight: 400;
 }
 
 .prompt {
-  color: #e6eeff;
+  color: #a0aab8;
   min-height: 1.2rem;
+  font-size: 0.9rem;
 }
 
 .leaderboard {
@@ -194,11 +209,30 @@ button:disabled {
   gap: 12px;
 }
 
+.leaderboard h2 {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #8a9aac;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
 .score-entry {
   display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 12px;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
   align-items: center;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #1a2530;
+  margin-bottom: 8px;
+}
+
+.score-entry label {
+  font-size: 0.8rem;
+  color: #6a7a8a;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .score-entry.hidden {
@@ -206,23 +240,23 @@ button:disabled {
 }
 
 #playerName {
-  padding: 10px;
-  border-radius: 8px;
-  border: 1px solid #2b537f;
-  background: #09182b;
-  color: #f5f7ff;
-  font-size: 1rem;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  padding: 8px 10px;
+  border-radius: 2px;
+  border: 1px solid #2a3a4a;
+  background: #0a1018;
+  color: #c8d0dc;
+  font-size: 0.9rem;
+  font-family: inherit;
 }
 
 #playerName:focus {
   outline: none;
-  border-color: #5096c8;
-  box-shadow: 0 0 0 3px rgba(79, 150, 200, 0.3);
+  border-color: #c49a4a;
+  box-shadow: 0 0 0 2px rgba(196, 154, 74, 0.2);
 }
 
 #playerName::placeholder {
-  color: #6a8aaa;
+  color: #4a5a6a;
 }
 
 ol {
@@ -233,22 +267,36 @@ ol {
 }
 
 li {
-  color: #d6e4ff;
+  color: #a0aab8;
+  font-size: 0.9rem;
+}
+
+li strong {
+  color: #c8d0dc;
+  font-weight: 500;
+}
+
+.classification {
+  color: #6a7a8a;
+  font-size: 0.8rem;
+  font-style: italic;
 }
 
 .badge {
   position: absolute;
-  top: 14px;
-  right: 14px;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: #f2d35c;
-  color: #1a1d22;
+  top: 10px;
+  right: 10px;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  border-radius: 12px;
+  background: #c49a4a;
+  color: #0a1018;
   display: grid;
   place-items: center;
   font-weight: 700;
-  box-shadow: 0 0 12px rgba(242, 211, 92, 0.6);
+  font-size: 0.7rem;
+  box-shadow: 0 0 8px rgba(196, 154, 74, 0.5);
 }
 
 .badge.hidden {
@@ -258,13 +306,18 @@ li {
 .veil {
   position: absolute;
   inset: 0;
-  background: linear-gradient(120deg, rgba(10, 30, 60, 0.2), rgba(242, 211, 92, 0.15));
-  backdrop-filter: blur(2px);
+  background: linear-gradient(120deg, rgba(5, 10, 16, 0.3), rgba(196, 154, 74, 0.1));
+  backdrop-filter: blur(1px);
   opacity: 0;
+  z-index: 5;
 }
 
 .veil.show {
   animation: veil-slide 1.4s ease-in-out;
+}
+
+.veil.hidden {
+  display: none;
 }
 
 @keyframes veil-slide {
@@ -273,10 +326,10 @@ li {
     transform: translateX(-20%);
   }
   30% {
-    opacity: 0.45;
+    opacity: 0.5;
   }
   70% {
-    opacity: 0.45;
+    opacity: 0.5;
   }
   100% {
     opacity: 0;
@@ -286,14 +339,32 @@ li {
 
 .cursor {
   position: absolute;
-  width: 18px;
-  height: 18px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
-  border: 2px solid #f2d35c;
-  box-shadow: 0 0 8px rgba(242, 211, 92, 0.5);
+  border: 2px solid #c49a4a;
+  box-shadow: 0 0 6px rgba(196, 154, 74, 0.4);
   pointer-events: none;
+  z-index: 5;
 }
 
 .cursor.hidden {
   display: none;
+}
+
+.footer {
+  text-align: center;
+  padding: 12px 0 0;
+}
+
+.footer p {
+  margin: 0;
+  color: #4a5a6a;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+}
+
+/* Screen shake support */
+.screen {
+  transition: transform 0.1s ease-out;
 }
