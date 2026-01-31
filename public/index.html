@@ -11,6 +11,7 @@
       <header class="header">
         <h1>Maintain</h1>
         <p class="subtitle">Remain present.</p>
+        <p class="meta">Concept: autistic masking.</p>
       </header>
 
       <section class="panel">
@@ -19,12 +20,23 @@
           <canvas id="overlay"></canvas>
           <div id="status" class="status">Idle</div>
           <div id="notice" class="notice hidden"></div>
+          <div id="badge" class="badge hidden">!</div>
+          <div id="veil" class="veil hidden"></div>
+          <div id="cursor" class="cursor hidden"></div>
         </div>
 
         <div class="controls">
           <p class="privacy">
             Webcam processing happens entirely in your browser. No video or images are uploaded or stored.
           </p>
+          <div class="instructions">
+            <h2>Instructions</h2>
+            <ul>
+              <li>Keep your eyes inside the center box.</li>
+              <li>Maintain a visible smile.</li>
+              <li>Looking away or holding a blink for 0.7s ends the run.</li>
+            </ul>
+          </div>
           <button id="startBtn">Start</button>
           <div id="timer" class="timer">00:00.000</div>
           <div id="prompt" class="prompt"></div>
