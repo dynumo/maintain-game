@@ -11,6 +11,7 @@ const MAX_TIME_MS = 10 * 60 * 1000;
 const MIN_NAME_LENGTH = 2;
 const MAX_NAME_LENGTH = 24;
 const RATE_LIMIT_MS = 2000;
+const RESET_TOKEN = process.env.LEADERBOARD_RESET_TOKEN || null;
 
 // Ensure data directory exists
 if (!fs.existsSync(DATA_DIR)) {
@@ -36,8 +37,13 @@ app.use(express.static(path.join(__dirname, 'public')));
 const lastSubmitByIp = new Map();
 
 app.get('/api/scores', (req, res) => {
+  // Set cache control headers to prevent stale data
+  res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+
   db.all(
-    'SELECT name, time_ms, created_at FROM scores ORDER BY time_ms DESC, created_at ASC LIMIT 10',
+    'SELECT name, time_ms, created_at FROM scores ORDER BY time_ms DESC, created_at ASC LIMIT 20',
     (err, rows) => {
       if (err) {
         res.status(500).json({ error: 'db_error' });
@@ -87,6 +93,34 @@ app.post('/api/scores', (req, res) => {
   );
 });
 
+// Reset leaderboard endpoint - requires LEADERBOARD_RESET_TOKEN env var
+app.delete('/api/scores', (req, res) => {
+  // Check if reset token is configured
+  if (!RESET_TOKEN) {
+    res.status(403).json({ error: 'reset_not_configured', message: 'LEADERBOARD_RESET_TOKEN environment variable not set' });
+    return;
+  }
+
+  // Validate the provided token
+  const providedToken = req.headers['x-reset-token'] || req.query.token;
+  if (!providedToken || providedToken !== RESET_TOKEN) {
+    res.status(401).json({ error: 'invalid_token', message: 'Invalid or missing reset token' });
+    return;
+  }
+
+  db.run('DELETE FROM scores', (err) => {
+    if (err) {
+      res.status(500).json({ error: 'db_error' });
+      return;
+    }
+    console.log('Leaderboard reset by authorized request');
+    res.json({ ok: true, message: 'Leaderboard has been reset' });
+  });
+});
+
 app.listen(PORT, () => {
   console.log(`Maintain running on http://localhost:${PORT}`);
+  if (RESET_TOKEN) {
+    console.log('Leaderboard reset endpoint enabled (DELETE /api/scores)');
+  }
 });

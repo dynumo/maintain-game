@@ -17,6 +17,12 @@ const loadingText = document.getElementById('loadingText');
 const countdownDisplay = document.getElementById('countdownDisplay');
 const debugPanel = document.getElementById('debugPanel');
 const debugValues = document.getElementById('debugValues');
+const smileFeedback = document.getElementById('smileFeedback');
+const noiseCanvas = document.getElementById('noiseCanvas');
+const scanLines = document.getElementById('scanLines');
+const musicToggle = document.getElementById('musicToggle');
+const volumeSlider = document.getElementById('volumeSlider');
+const mediaControls = document.getElementById('mediaControls');
 
 // Debug mode - always show tracking info
 const DEBUG_MODE = true;
@@ -40,7 +46,7 @@ const CONFIG = {
   EYE_OPENNESS_THRESHOLD: 0.012,   // Lower = less sensitive to blinks
   MOVEMENT_THRESHOLD: 0.015,
   FACE_LOST_MS: 2500,              // More time before face lost fail
-  GAZE_AWAY_LIMIT_MS: 3000,        // 3 seconds as requested
+  GAZE_AWAY_LIMIT_MS: 2000,        // 2 seconds - reduced from 3
   EYES_CLOSED_LIMIT_MS: 3000,      // 3 seconds as requested
   BLINK_CHECK_INTERVAL_MS: 20000,
   MOVEMENT_WINDOW_MS: 2500,
@@ -57,8 +63,10 @@ const CONFIG = {
   COUNTDOWN_SECONDS: 3,            // Countdown before calibration starts
   // Face mesh visualization
   SHOW_FACE_MESH: true,            // Show the face mesh overlay
-  MESH_COLOR: 'rgba(122, 160, 122, 0.4)',  // Greenish to match theme
-  MESH_LINE_WIDTH: 0.5
+  MESH_COLOR: 'rgba(122, 160, 122, 0.7)',  // Greenish - more visible (was 0.4)
+  MESH_LINE_WIDTH: 0.5,
+  // Smile feedback threshold (0-100 scale for display, ratio internally)
+  SMILE_DISPLAY_THRESHOLD: 50      // Show "Keep smiling!" when below this
 };
 
 // Face mesh triangulation indices (from TensorFlow.js face-landmarks-detection)
@@ -194,6 +202,154 @@ function playPing(frequency = 880, duration = 0.08, volume = 0.15) {
     oscillator.stop(ctx.currentTime + duration);
   } catch (e) {
     // Audio not supported or blocked
+  }
+}
+
+// Background music support
+let bgMusic = null;
+let bgMusicAvailable = false;
+
+async function checkBackgroundMusic() {
+  try {
+    const response = await fetch('/maintain-bg-music.mp3', { method: 'HEAD' });
+    if (response.ok) {
+      bgMusicAvailable = true;
+      bgMusic = new Audio('/maintain-bg-music.mp3');
+      bgMusic.loop = true;
+      bgMusic.volume = 0.3;
+      // Show music controls if music is available
+      if (musicToggle) {
+        musicToggle.classList.remove('hidden');
+      }
+      if (volumeSlider) {
+        volumeSlider.classList.remove('hidden');
+      }
+      log('AUDIO', 'Background music file detected and loaded');
+    }
+  } catch (e) {
+    bgMusicAvailable = false;
+    log('AUDIO', 'No background music file found (optional)');
+  }
+}
+
+function toggleBackgroundMusic() {
+  if (!bgMusic || !bgMusicAvailable) return;
+
+  if (bgMusic.paused) {
+    bgMusic.play().catch(e => {
+      log('AUDIO', 'Could not play background music', e);
+    });
+    if (musicToggle) {
+      musicToggle.textContent = '♪';
+      musicToggle.title = 'Mute Music';
+      musicToggle.setAttribute('aria-pressed', 'true');
+    }
+  } else {
+    bgMusic.pause();
+    if (musicToggle) {
+      musicToggle.textContent = '♪';
+      musicToggle.title = 'Play Music';
+      musicToggle.setAttribute('aria-pressed', 'false');
+    }
+  }
+}
+
+function setMusicVolume(volume) {
+  if (bgMusic) {
+    bgMusic.volume = Math.max(0, Math.min(1, volume));
+  }
+}
+
+// TV noise effect for idle state
+let noiseAnimationId = null;
+
+function generateNoise() {
+  if (!noiseCanvas) return;
+
+  const ctx = noiseCanvas.getContext('2d');
+  const width = noiseCanvas.width = noiseCanvas.offsetWidth || 640;
+  const height = noiseCanvas.height = noiseCanvas.offsetHeight || 480;
+
+  const imageData = ctx.createImageData(width, height);
+  const data = imageData.data;
+
+  // Duotone noise - dark green and slightly lighter green
+  for (let i = 0; i < data.length; i += 4) {
+    const noise = Math.random() > 0.5 ? 1 : 0;
+    // Dark color: very dark green-gray
+    // Light color: slightly brighter green-gray
+    const baseValue = noise ? 20 : 8;
+    const greenBoost = noise ? 25 : 12;
+
+    data[i] = baseValue;           // R
+    data[i + 1] = greenBoost;      // G (slightly more green)
+    data[i + 2] = baseValue;       // B
+    data[i + 3] = 40;              // Alpha (subtle)
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+}
+
+function startNoiseAnimation() {
+  if (!noiseCanvas) return;
+
+  noiseCanvas.classList.remove('hidden');
+
+  function animateNoise() {
+    generateNoise();
+    noiseAnimationId = requestAnimationFrame(animateNoise);
+  }
+
+  // Animate at lower framerate for performance
+  let lastNoiseTime = 0;
+  function throttledNoise(now) {
+    if (now - lastNoiseTime > 100) { // ~10fps for noise
+      generateNoise();
+      lastNoiseTime = now;
+    }
+    if (state.phase === 'idle' || state.phase === 'failed') {
+      noiseAnimationId = requestAnimationFrame(throttledNoise);
+    }
+  }
+
+  noiseAnimationId = requestAnimationFrame(throttledNoise);
+}
+
+function stopNoiseAnimation() {
+  if (noiseAnimationId) {
+    cancelAnimationFrame(noiseAnimationId);
+    noiseAnimationId = null;
+  }
+  if (noiseCanvas) {
+    noiseCanvas.classList.add('hidden');
+  }
+}
+
+// Show/hide scan lines based on state
+function updateScanLines(show) {
+  if (scanLines) {
+    if (show) {
+      scanLines.classList.remove('hidden');
+    } else {
+      scanLines.classList.add('hidden');
+    }
+  }
+}
+
+// Update smile feedback display
+function updateSmileFeedback(smileRatio) {
+  if (!smileFeedback) return;
+
+  // Convert ratio to a percentage-like scale (0-100)
+  // smileRatio > 0.9 is good, below 0.72 (0.9 * 0.8) shows warning
+  const smilePercentage = (smileRatio / CONFIG.SMILE_THRESHOLD) * 100;
+
+  if (state.phase === 'running' && smilePercentage < CONFIG.SMILE_DISPLAY_THRESHOLD) {
+    const messages = ['Keep smiling!', 'You should smile more!'];
+    smileFeedback.textContent = messages[Math.floor(Date.now() / 3000) % messages.length];
+    smileFeedback.classList.remove('hidden');
+  } else {
+    smileFeedback.classList.add('hidden');
   }
 }
 
@@ -1040,6 +1196,15 @@ async function startGame() {
   timerLabel.textContent = formatTime(0);
   state.zoneCache = null;
 
+  // Stop idle noise animation, keep scan lines
+  stopNoiseAnimation();
+  updateScanLines(true);
+
+  // Hide smile feedback at start
+  if (smileFeedback) {
+    smileFeedback.classList.add('hidden');
+  }
+
   log('GAME', '=== Starting new game ===');
 
   // Show loading overlay
@@ -1379,6 +1544,15 @@ function failRun(message, reason = 'unknown') {
   if (DEBUG_MODE && state.currentDebugData) {
     updateDebugPanel(state.currentDebugData);
   }
+
+  // Restart noise animation for idle state, keep scan lines
+  startNoiseAnimation();
+  updateScanLines(true);
+
+  // Hide smile feedback
+  if (smileFeedback) {
+    smileFeedback.classList.add('hidden');
+  }
 }
 
 async function loop(now) {
@@ -1532,14 +1706,16 @@ async function loop(now) {
   // Draw face mesh overlay
   drawFaceMesh(ctx, keypoints);
 
-  // Draw debug info on canvas
+  // Debug data for sidebar (no longer drawn on canvas - was redundant and mirrored)
   const debugData = { inZone, smileRatio, eyeOpenness };
-  drawDebugCanvas(ctx, width, height, debugData);
 
   // Update sidebar debug panel
   if (DEBUG_MODE) {
     updateDebugPanel(debugData);
   }
+
+  // Update smile feedback overlay
+  updateSmileFeedback(smileRatio);
 
   if (eyesClosed) {
     state.lastBlinkTime = now;
@@ -1604,7 +1780,11 @@ async function loop(now) {
 
 async function fetchScores() {
   try {
-    const response = await fetch('/api/scores');
+    // Add cache-busting parameter to force fresh data
+    const cacheBuster = `_t=${Date.now()}`;
+    const response = await fetch(`/api/scores?${cacheBuster}`, {
+      cache: 'no-store'
+    });
     if (!response.ok) {
       throw new Error('Failed to fetch');
     }
@@ -1618,10 +1798,11 @@ async function fetchScores() {
       return;
     }
 
-    data.scores.forEach((score) => {
+    data.scores.forEach((score, index) => {
       const classification = getClassification(score.time_ms);
       const item = document.createElement('li');
       item.innerHTML = `<strong>${escapeHtml(score.name)}</strong> — ${formatTime(score.time_ms)} <span class="classification">[${classification.label}]</span>`;
+      item.setAttribute('role', 'listitem');
       scoresList.appendChild(item);
     });
   } catch (err) {
@@ -1748,6 +1929,32 @@ if (fullscreenBtn) {
   });
 }
 
+// Music toggle handler
+if (musicToggle) {
+  musicToggle.addEventListener('click', toggleBackgroundMusic);
+  musicToggle.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      toggleBackgroundMusic();
+    }
+  });
+}
+
+// Volume slider handler
+if (volumeSlider) {
+  volumeSlider.addEventListener('input', (e) => {
+    setMusicVolume(parseFloat(e.target.value));
+  });
+}
+
 log('INIT', 'Game initialized');
+
+// Check for optional background music
+checkBackgroundMusic();
+
+// Start with noise and scan lines (idle state)
+startNoiseAnimation();
+updateScanLines(true);
+
 fetchScores();
 setPrompt('Awaiting subject.');

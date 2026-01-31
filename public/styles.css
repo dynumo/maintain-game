@@ -9,6 +9,36 @@
   box-sizing: border-box;
 }
 
+/* Accessibility - Skip link */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: #c49a4a;
+  color: #0a1018;
+  padding: 8px 16px;
+  z-index: 10000;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.skip-link:focus {
+  top: 0;
+}
+
+/* Screen reader only text */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
@@ -63,23 +93,122 @@ body {
   font-weight: 500;
 }
 
-.fullscreen-btn {
+/* Media controls container (bottom right) */
+.media-controls {
   position: fixed;
   bottom: 12px;
   right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(200, 200, 200, 0.2);
+}
+
+/* Hide music controls when not available */
+.music-control.hidden {
+  display: none;
+}
+
+/* Simpler styling when only fullscreen button is visible */
+.media-controls:has(.music-control.hidden) {
+  padding: 4px;
+  background: transparent;
+  border: none;
+}
+
+.media-btn {
   background: rgba(0, 0, 0, 0.5);
   border: 1px solid rgba(200, 200, 200, 0.3);
   color: #e8eef6;
-  font-size: 1.5rem;
-  width: 40px;
-  height: 40px;
+  font-size: 1.25rem;
+  width: 36px;
+  height: 36px;
   border-radius: 6px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease;
-  z-index: 1000;
+  padding: 0;
+}
+
+.media-btn:hover {
+  background: rgba(0, 255, 0, 0.2);
+  border-color: #00ff00;
+  transform: scale(1.05);
+}
+
+.media-btn:focus {
+  outline: 2px solid #c49a4a;
+  outline-offset: 2px;
+}
+
+.media-btn:active {
+  transform: scale(0.95);
+}
+
+.media-btn[aria-pressed="true"] {
+  background: rgba(0, 255, 0, 0.3);
+  border-color: #00ff00;
+}
+
+.volume-slider {
+  width: 60px;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(200, 200, 200, 0.3);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  background: #c49a4a;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.volume-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+.volume-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  background: #c49a4a;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+}
+
+.volume-slider:focus {
+  outline: 2px solid #c49a4a;
+  outline-offset: 2px;
+}
+
+/* Legacy fullscreen button (now part of media controls) */
+.fullscreen-btn {
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(200, 200, 200, 0.3);
+  color: #e8eef6;
+  font-size: 1.25rem;
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
   padding: 0;
 }
 
@@ -145,6 +274,75 @@ video {
   pointer-events: none;
   /* Mirror canvas to match video */
   transform: scaleX(-1);
+}
+
+/* TV noise overlay for idle state */
+.noise-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 2;
+  opacity: 0.6;
+  mix-blend-mode: overlay;
+}
+
+.noise-canvas.hidden {
+  display: none;
+}
+
+/* Scan lines overlay - always visible during game */
+.scan-lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 3;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.15) 2px,
+    rgba(0, 0, 0, 0.15) 4px
+  );
+  opacity: 0.5;
+}
+
+.scan-lines.hidden {
+  display: none;
+}
+
+/* Smile feedback overlay - bottom left of video */
+.smile-feedback {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  padding: 6px 12px;
+  background: rgba(10, 16, 24, 0.9);
+  border: 1px solid #c49a4a;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  color: #c49a4a;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  z-index: 15;
+  animation: pulse-feedback 2s ease-in-out infinite;
+}
+
+.smile-feedback.hidden {
+  display: none;
+}
+
+@keyframes pulse-feedback {
+  0%, 100% {
+    opacity: 0.9;
+  }
+  50% {
+    opacity: 0.6;
+  }
 }
 
 .status {
@@ -397,6 +595,32 @@ button:disabled {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-weight: 500;
+}
+
+/* Scrollable scores container - shows 5 items, scrolls for more */
+.scores-container {
+  max-height: 160px; /* ~5 items */
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #2a3a4a #0a1018;
+}
+
+.scores-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scores-container::-webkit-scrollbar-track {
+  background: #0a1018;
+  border-radius: 3px;
+}
+
+.scores-container::-webkit-scrollbar-thumb {
+  background: #2a3a4a;
+  border-radius: 3px;
+}
+
+.scores-container::-webkit-scrollbar-thumb:hover {
+  background: #3a4a5a;
 }
 
 .score-entry {
