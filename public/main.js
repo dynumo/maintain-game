@@ -13,12 +13,62 @@ const playerName = document.getElementById('playerName');
 const submitScore = document.getElementById('submitScore');
 const scoresList = document.getElementById('scores');
 
+// Configuration constants
+const CONFIG = {
+  ZONE_WIDTH_RATIO: 0.3,
+  ZONE_HEIGHT_RATIO: 0.35,
+  SMILE_THRESHOLD: 1.9,
+  EYE_OPENNESS_THRESHOLD: 0.015,
+  MOVEMENT_THRESHOLD: 0.02,
+  FACE_LOST_MS: 1500,
+  GAZE_AWAY_LIMIT_MS: 700,
+  EYES_CLOSED_LIMIT_MS: 700,
+  BLINK_CHECK_INTERVAL_MS: 15000,
+  MOVEMENT_WINDOW_MS: 2200,
+  MAX_MOVEMENT_SAMPLES: 200,
+  DETECTION_THROTTLE_MS: 33, // ~30fps for face detection
+  CALIBRATION_MS: 2200,
+  MAX_SCORE_MS: 600000 // 10 minute cap
+};
+
+// Audio context for notification sounds
+let audioCtx = null;
+
+function initAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  return audioCtx;
+}
+
+function playPing(frequency = 880, duration = 0.08, volume = 0.15) {
+  try {
+    const ctx = initAudio();
+    if (ctx.state === 'suspended') {
+      ctx.resume();
+    }
+    const oscillator = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+    oscillator.connect(gainNode);
+    gainNode.connect(ctx.destination);
+    oscillator.frequency.value = frequency;
+    oscillator.type = 'sine';
+    gainNode.gain.setValueAtTime(volume, ctx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+    oscillator.start(ctx.currentTime);
+    oscillator.stop(ctx.currentTime + duration);
+  } catch (e) {
+    // Audio not supported or blocked, fail silently
+  }
+}
+
 const state = {
   phase: 'idle',
   detector: null,
   startTime: 0,
   lastFrameTime: 0,
   lastFaceTime: 0,
+  lastDetectionTime: 0,
   eyeDrift: 0,
   smileDrift: 0,
   livenessDrift: 0,
@@ -30,7 +80,10 @@ const state = {
   lastPoints: null,
   processing: false,
   distractions: null,
-  distractionLevel: 0
+  distractionLevel: 0,
+  zoneCache: null, // Cached zone drawing
+  rafId: null, // Track animation frame for cleanup
+  failureTime: 0 // Store exact failure time
 };
 
 const prompts = [
@@ -50,6 +103,50 @@ const notices = [
 
 const badges = ['1', '2', '3', '5', '!', '?'];
 
+// Varied failure messages per spec - vague, neutral, mildly passive-aggressive
+const failureMessages = {
+  gaze: [
+    'You seemed disengaged.',
+    'Your attention drifted.',
+    'Eye contact was insufficient.',
+    'Please remain focused.',
+    'That was noted.'
+  ],
+  expression: [
+    'That expression was inappropriate.',
+    'Expression was insufficient.',
+    'Your demeanor was unsatisfactory.',
+    'Please maintain composure.',
+    'That was... unexpected.'
+  ],
+  presence: [
+    'Presence degraded.',
+    'You appeared absent.',
+    'Engagement dropped below threshold.',
+    'Please remain present.',
+    'Activity level was insufficient.'
+  ],
+  blink: [
+    'Blink duration exceeded the limit.',
+    'Your eyes were closed too long.',
+    'Prolonged eye closure detected.',
+    'Please keep your eyes open.',
+    'That was concerning.'
+  ],
+  liveness: [
+    'Liveness confirmation failed.',
+    'Movement was insufficient.',
+    'Please demonstrate activity.',
+    'You seemed frozen.',
+    'Natural behavior not detected.'
+  ]
+};
+
+function getFailureMessage(type) {
+  const messages = failureMessages[type] || failureMessages.presence;
+  return messages[Math.floor(Math.random() * messages.length)];
+}
+
 function setStatus(text) {
   statusLabel.textContent = text;
 }
@@ -67,8 +164,8 @@ function formatTime(ms) {
 }
 
 function drawZone(ctx, width, height) {
-  const zoneWidth = width * 0.3;
-  const zoneHeight = height * 0.35;
+  const zoneWidth = width * CONFIG.ZONE_WIDTH_RATIO;
+  const zoneHeight = height * CONFIG.ZONE_HEIGHT_RATIO;
   const x = (width - zoneWidth) / 2;
   const y = (height - zoneHeight) / 2;
   ctx.strokeStyle = 'rgba(122, 122, 160, 0.8)';
@@ -118,8 +215,15 @@ function showCursor() {
   setTimeout(() => cursor.classList.add('hidden'), 700);
 }
 
+function playNotificationPing() {
+  // Vary the ping sound slightly for different "notification types"
+  const frequencies = [880, 1046, 784, 659];
+  const freq = frequencies[Math.floor(Math.random() * frequencies.length)];
+  playPing(freq, 0.1, 0.12);
+}
+
 function triggerDistraction() {
-  const options = [showNotice, showBadge, showVeil, showCursor];
+  const options = [showNotice, showBadge, showVeil, showCursor, playNotificationPing];
   const pick = options[Math.floor(Math.random() * options.length)];
   pick();
 }
@@ -171,41 +275,89 @@ async function startGame() {
   setStatus('Requesting webcam');
   setPrompt('');
   timerLabel.textContent = formatTime(0);
+  state.zoneCache = null; // Clear zone cache for fresh start
 
-  if (!video.srcObject) {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-    video.srcObject = stream;
+  try {
+    if (!video.srcObject) {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: 'user',
+          width: { ideal: 640 },
+          height: { ideal: 480 }
+        }
+      });
+      video.srcObject = stream;
+    }
+  } catch (err) {
+    let errorMsg = 'Webcam access denied.';
+    if (err.name === 'NotFoundError') {
+      errorMsg = 'No webcam detected.';
+    } else if (err.name === 'NotReadableError') {
+      errorMsg = 'Webcam is in use by another application.';
+    } else if (err.name === 'OverconstrainedError') {
+      errorMsg = 'Webcam does not meet requirements.';
+    }
+    setStatus('Error');
+    setPrompt(errorMsg);
+    startBtn.disabled = false;
+    startBtn.textContent = 'Retry';
+    return;
   }
 
+  setStatus('Initializing camera');
   await new Promise((resolve) => {
     video.onloadedmetadata = () => resolve();
   });
-  await video.play();
+
+  try {
+    await video.play();
+  } catch (err) {
+    setStatus('Error');
+    setPrompt('Failed to start video playback.');
+    startBtn.disabled = false;
+    startBtn.textContent = 'Retry';
+    return;
+  }
 
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
 
   if (!state.detector) {
-    setStatus('Loading model');
-    state.detector = await initDetector();
+    setStatus('Loading model...');
+    setPrompt('This may take a moment.');
+    try {
+      state.detector = await initDetector();
+    } catch (err) {
+      setStatus('Error');
+      setPrompt('Failed to load face detection model.');
+      startBtn.disabled = false;
+      startBtn.textContent = 'Retry';
+      return;
+    }
   }
 
+  // Initialize audio context on user interaction (required by browsers)
+  initAudio();
+
   setStatus('Calibrating');
-  setPrompt('Hold steady.');
+  setPrompt('Hold steady. Look at the center box.');
   state.phase = 'calibrating';
   state.lastFrameTime = performance.now();
   state.lastFaceTime = performance.now();
+  state.lastDetectionTime = 0;
   resetMetrics(performance.now());
   scheduleDistractions();
 
   setTimeout(() => {
-    state.phase = 'running';
-    state.startTime = performance.now();
-    setStatus('Running');
-    setPrompt(prompts[Math.floor(Math.random() * prompts.length)]);
-  }, 2200);
+    if (state.phase === 'calibrating') {
+      state.phase = 'running';
+      state.startTime = performance.now();
+      setStatus('Running');
+      setPrompt(prompts[Math.floor(Math.random() * prompts.length)]);
+    }
+  }, CONFIG.CALIBRATION_MS);
 
-  requestAnimationFrame(loop);
+  state.rafId = requestAnimationFrame(loop);
 }
 
 function getPoint(keypoints, index) {
@@ -234,12 +386,28 @@ function updateMovement(now, nose, leftEye, rightEye, width) {
   const normalized = movement / width;
   state.movementSamples.push({ time: now, value: normalized });
 
-  const windowMs = 2200;
-  while (state.movementSamples.length && now - state.movementSamples[0].time > windowMs) {
-    state.movementSamples.shift();
+  // Efficiently prune old samples with bounded array size
+  const windowMs = CONFIG.MOVEMENT_WINDOW_MS;
+  let pruneIndex = 0;
+  while (pruneIndex < state.movementSamples.length &&
+         now - state.movementSamples[pruneIndex].time > windowMs) {
+    pruneIndex++;
+  }
+  if (pruneIndex > 0) {
+    state.movementSamples = state.movementSamples.slice(pruneIndex);
   }
 
-  return state.movementSamples.reduce((sum, sample) => sum + sample.value, 0);
+  // Hard cap to prevent memory issues
+  if (state.movementSamples.length > CONFIG.MAX_MOVEMENT_SAMPLES) {
+    state.movementSamples = state.movementSamples.slice(-CONFIG.MAX_MOVEMENT_SAMPLES);
+  }
+
+  // Calculate total with cached sum for better performance
+  let total = 0;
+  for (let i = 0; i < state.movementSamples.length; i++) {
+    total += state.movementSamples[i].value;
+  }
+  return total;
 }
 
 function getEyeOpenness(leftUpper, leftLower, rightUpper, rightLower, width) {
@@ -248,16 +416,35 @@ function getEyeOpenness(leftUpper, leftLower, rightUpper, rightLower, width) {
   return (leftOpen + rightOpen) / 2;
 }
 
+function stopVideoStream() {
+  if (video.srcObject) {
+    video.pause();
+    const tracks = video.srcObject.getTracks();
+    tracks.forEach(track => track.stop());
+    video.srcObject = null;
+  }
+}
+
 function failRun(message) {
+  // Store failure time immediately for accurate scoring
+  state.failureTime = performance.now();
   state.phase = 'failed';
   setStatus('Failed');
   setPrompt(message);
-  if (video.srcObject) {
-    video.pause();
-  }
+
+  // Clean up resources
+  stopVideoStream();
+
   if (state.distractions) {
     clearTimeout(state.distractions);
+    state.distractions = null;
   }
+
+  if (state.rafId) {
+    cancelAnimationFrame(state.rafId);
+    state.rafId = null;
+  }
+
   startBtn.disabled = false;
   startBtn.textContent = 'Retry';
   scoreEntry.classList.remove('hidden');
@@ -266,32 +453,49 @@ function failRun(message) {
 
 async function loop(now) {
   if (state.phase === 'idle') {
+    state.rafId = null;
     return;
   }
 
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  drawZone(ctx, canvas.width, canvas.height);
+
+  // Use cached zone if available, otherwise draw and cache
+  if (state.zoneCache && state.zoneCache.width === canvas.width && state.zoneCache.height === canvas.height) {
+    ctx.drawImage(state.zoneCache, 0, 0);
+  } else {
+    drawZone(ctx, canvas.width, canvas.height);
+    // Cache the zone drawing
+    state.zoneCache = document.createElement('canvas');
+    state.zoneCache.width = canvas.width;
+    state.zoneCache.height = canvas.height;
+    const cacheCtx = state.zoneCache.getContext('2d');
+    drawZone(cacheCtx, canvas.width, canvas.height);
+  }
+
   updateTimer(now);
 
   const dt = now - state.lastFrameTime;
   state.lastFrameTime = now;
 
-  if (state.processing || !state.detector) {
-    requestAnimationFrame(loop);
+  // Throttle face detection to reduce CPU/GPU usage
+  const timeSinceLastDetection = now - state.lastDetectionTime;
+  if (state.processing || !state.detector || timeSinceLastDetection < CONFIG.DETECTION_THROTTLE_MS) {
+    state.rafId = requestAnimationFrame(loop);
     return;
   }
 
   state.processing = true;
+  state.lastDetectionTime = now;
   const faces = await state.detector.estimateFaces(video, { flipHorizontal: false });
   state.processing = false;
 
   if (!faces.length) {
-    if (now - state.lastFaceTime > 1500 && state.phase === 'running') {
+    if (now - state.lastFaceTime > CONFIG.FACE_LOST_MS && state.phase === 'running') {
       failRun('Tracking lost.');
       return;
     }
-    requestAnimationFrame(loop);
+    state.rafId = requestAnimationFrame(loop);
     return;
   }
 
@@ -314,16 +518,22 @@ async function loop(now) {
   const width = canvas.width;
   const height = canvas.height;
 
-  const zoneWidth = width * 0.3;
-  const zoneHeight = height * 0.35;
+  const zoneWidth = width * CONFIG.ZONE_WIDTH_RATIO;
+  const zoneHeight = height * CONFIG.ZONE_HEIGHT_RATIO;
   const zoneX = (width - zoneWidth) / 2;
   const zoneY = (height - zoneHeight) / 2;
 
+  // Use center point between eyes instead of nose for more accurate gaze detection
+  const eyeCenter = {
+    x: (leftEye.x + rightEye.x) / 2,
+    y: (leftEye.y + rightEye.y) / 2
+  };
+
   const inZone =
-    nose.x > zoneX &&
-    nose.x < zoneX + zoneWidth &&
-    nose.y > zoneY &&
-    nose.y < zoneY + zoneHeight;
+    eyeCenter.x > zoneX &&
+    eyeCenter.x < zoneX + zoneWidth &&
+    eyeCenter.y > zoneY &&
+    eyeCenter.y < zoneY + zoneHeight;
 
   if (inZone) {
     state.eyeDrift = Math.max(0, state.eyeDrift - dt / 600);
@@ -337,21 +547,21 @@ async function loop(now) {
   const mouthHeight = distance(upperLip, lowerLip);
   const smileRatio = mouthWidth / Math.max(1, mouthHeight);
 
-  if (smileRatio > 1.9) {
+  if (smileRatio > CONFIG.SMILE_THRESHOLD) {
     state.smileDrift = Math.max(0, state.smileDrift - dt / 600);
   } else {
     state.smileDrift += dt / 1000;
   }
 
   const movementTotal = updateMovement(now, nose, leftEye, rightEye, width);
-  if (movementTotal < 0.02) {
+  if (movementTotal < CONFIG.MOVEMENT_THRESHOLD) {
     state.livenessDrift += dt / 1800;
   } else {
     state.livenessDrift = Math.max(0, state.livenessDrift - dt / 600);
   }
 
   const eyeOpenness = getEyeOpenness(leftUpper, leftLower, rightUpper, rightLower, width);
-  const eyesClosed = eyeOpenness < 0.015;
+  const eyesClosed = eyeOpenness < CONFIG.EYE_OPENNESS_THRESHOLD;
   if (eyesClosed) {
     state.lastBlinkTime = now;
     state.eyesClosedMs += dt;
@@ -359,7 +569,7 @@ async function loop(now) {
     state.eyesClosedMs = Math.max(0, state.eyesClosedMs - dt * 2);
   }
 
-  if (now - state.lastBlinkTime > 15000) {
+  if (now - state.lastBlinkTime > CONFIG.BLINK_CHECK_INTERVAL_MS) {
     state.blinkDrift += dt / 2000;
   } else {
     state.blinkDrift = Math.max(0, state.blinkDrift - dt / 800);
@@ -367,78 +577,135 @@ async function loop(now) {
 
   if (state.phase === 'running') {
     if (state.eyeDrift > 1) {
-      failRun('Eye contact was interrupted.');
+      failRun(getFailureMessage('gaze'));
       return;
     }
-    if (state.gazeAwayMs > 700) {
-      failRun('Looking away exceeded the limit.');
+    if (state.gazeAwayMs > CONFIG.GAZE_AWAY_LIMIT_MS) {
+      failRun(getFailureMessage('gaze'));
       return;
     }
     if (state.smileDrift > 1) {
-      failRun('Expression was insufficient.');
+      failRun(getFailureMessage('expression'));
       return;
     }
     if (state.livenessDrift > 1) {
-      failRun('Presence degraded.');
+      failRun(getFailureMessage('presence'));
       return;
     }
-    if (state.eyesClosedMs > 700) {
-      failRun('Blink duration exceeded the limit.');
+    if (state.eyesClosedMs > CONFIG.EYES_CLOSED_LIMIT_MS) {
+      failRun(getFailureMessage('blink'));
       return;
     }
     if (state.blinkDrift > 1) {
-      failRun('Liveness confirmation failed.');
+      failRun(getFailureMessage('liveness'));
       return;
     }
   }
 
-  requestAnimationFrame(loop);
+  state.rafId = requestAnimationFrame(loop);
 }
 
 async function fetchScores() {
-  const response = await fetch('/api/scores');
-  const data = await response.json();
-  scoresList.innerHTML = '';
+  try {
+    const response = await fetch('/api/scores');
+    if (!response.ok) {
+      throw new Error('Failed to fetch');
+    }
+    const data = await response.json();
+    scoresList.innerHTML = '';
 
-  if (!data.scores || !data.scores.length) {
-    const empty = document.createElement('li');
-    empty.textContent = 'No records.';
-    scoresList.appendChild(empty);
-    return;
+    if (!data.scores || !data.scores.length) {
+      const empty = document.createElement('li');
+      empty.textContent = 'No records.';
+      scoresList.appendChild(empty);
+      return;
+    }
+
+    data.scores.forEach((score) => {
+      const item = document.createElement('li');
+      item.textContent = `${score.name} — ${formatTime(score.time_ms)}`;
+      scoresList.appendChild(item);
+    });
+  } catch (err) {
+    scoresList.innerHTML = '';
+    const errItem = document.createElement('li');
+    errItem.textContent = 'Unable to load leaderboard.';
+    scoresList.appendChild(errItem);
   }
-
-  data.scores.forEach((score) => {
-    const item = document.createElement('li');
-    item.textContent = `${score.name} — ${formatTime(score.time_ms)}`;
-    scoresList.appendChild(item);
-  });
 }
 
 async function submitScoreEntry() {
   const name = playerName.value.trim() || 'SYSTEM';
-  const timeMs = state.startTime ? performance.now() - state.startTime : 0;
+  // Use stored failure time for accuracy, with cap per spec
+  let timeMs = state.failureTime && state.startTime
+    ? state.failureTime - state.startTime
+    : 0;
+  timeMs = Math.min(timeMs, CONFIG.MAX_SCORE_MS);
   submitScore.disabled = true;
 
-  await fetch('/api/scores', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, timeMs })
-  });
+  try {
+    const response = await fetch('/api/scores', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, timeMs: Math.round(timeMs) })
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      setPrompt(data.error || 'Failed to submit score.');
+      submitScore.disabled = false;
+      return;
+    }
+  } catch (err) {
+    setPrompt('Network error. Try again.');
+    submitScore.disabled = false;
+    return;
+  }
 
   scoreEntry.classList.add('hidden');
+  playerName.value = '';
   await fetchScores();
 }
 
-startBtn.addEventListener('click', () => {
+function handleStart() {
   if (state.phase === 'idle' || state.phase === 'failed') {
     scoreEntry.classList.add('hidden');
     submitScore.disabled = false;
     startBtn.textContent = 'Start';
+    state.phase = 'idle'; // Reset phase before starting
     startGame();
+  }
+}
+
+startBtn.addEventListener('click', handleStart);
+
+// Keyboard support for start button
+startBtn.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    handleStart();
   }
 });
 
 submitScore.addEventListener('click', submitScoreEntry);
+
+// Keyboard support for score submission
+playerName.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    if (!submitScore.disabled) {
+      submitScoreEntry();
+    }
+  }
+});
+
+// Clean up on page unload
+window.addEventListener('beforeunload', () => {
+  stopVideoStream();
+  if (state.rafId) {
+    cancelAnimationFrame(state.rafId);
+  }
+});
 
 fetchScores();
 setPrompt('Awaiting input.');
