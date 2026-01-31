@@ -27,18 +27,15 @@
 
         <div class="controls">
           <p class="privacy">
-            Webcam processing occurs entirely in your browser. No video or images are uploaded or stored.
+            Webcam processing occurs entirely in your browser. No data is uploaded.
           </p>
           <div class="instructions">
-            <h2>Assessment Protocol</h2>
+            <h2>Protocol</h2>
             <ul>
-              <li>Maintain visual attention within the designated zone.</li>
-              <li>Display appropriate expression levels at all times.</li>
-              <li>Deviation from expected behaviour will be recorded.</li>
-              <li>The system's expectations may change without notice.</li>
+              <li>Eyes in zone. Expression appropriate. Expectations may change.</li>
             </ul>
           </div>
-          <button id="startBtn">Begin Assessment</button>
+          <button id="startBtn">Begin Assessment [Space]</button>
           <div id="timer" class="timer">00:00.000</div>
           <div id="prompt" class="prompt"></div>
         </div>
@@ -54,9 +51,6 @@
         <ol id="scores"></ol>
       </section>
 
-      <footer class="footer">
-        <p>This assessment is mandatory. Your cooperation is expected.</p>
-      </footer>
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>

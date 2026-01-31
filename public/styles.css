@@ -13,21 +13,28 @@ body {
   margin: 0;
   min-height: 100vh;
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
-  padding: 32px;
+  padding: 16px;
   background: linear-gradient(180deg, #080d14 0%, #050a10 50%, #030508 100%);
 }
 
 .screen {
   width: min(1100px, 100%);
   display: grid;
-  gap: 20px;
+  gap: 12px;
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
 .header h1 {
   margin: 0;
-  font-size: 2.2rem;
+  font-size: 1.5rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   font-weight: 600;
@@ -35,16 +42,17 @@ body {
 }
 
 .subtitle {
-  margin: 4px 0 0;
+  margin: 0;
   color: #8a9aac;
-  font-size: 0.95rem;
+  font-size: 0.85rem;
   letter-spacing: 0.04em;
 }
 
 .meta {
-  margin: 8px 0 0;
+  margin: 0;
+  margin-left: auto;
   color: #c49a4a;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-weight: 500;
@@ -53,7 +61,7 @@ body {
 .panel {
   background: #0a1018;
   border: 1px solid #1a2530;
-  padding: 20px;
+  padding: 12px;
   border-radius: 4px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
 }
@@ -115,9 +123,23 @@ video,
 }
 
 .controls {
-  margin-top: 16px;
+  margin-top: 10px;
   display: grid;
-  gap: 12px;
+  grid-template-columns: 1fr auto;
+  gap: 8px 16px;
+  align-items: center;
+}
+
+.controls .privacy {
+  grid-column: 1 / -1;
+}
+
+.controls .instructions {
+  grid-column: 1 / -1;
+}
+
+.controls .prompt {
+  grid-column: 1 / -1;
 }
 
 .privacy {
