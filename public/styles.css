@@ -63,6 +63,36 @@ body {
   font-weight: 500;
 }
 
+.fullscreen-btn {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(200, 200, 200, 0.3);
+  color: #e8eef6;
+  font-size: 1.5rem;
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  z-index: 1000;
+  padding: 0;
+}
+
+.fullscreen-btn:hover {
+  background: rgba(0, 255, 0, 0.2);
+  border-color: #00ff00;
+  transform: scale(1.05);
+}
+
+.fullscreen-btn:active {
+  transform: scale(0.95);
+}
+
 /* Main content: Landscape layout */
 .main-content {
   display: grid;
