@@ -14,42 +14,63 @@
         <p class="meta">MANDATORY | SESSION ACTIVE</p>
       </header>
 
-      <section class="panel">
-        <div class="video-area">
-          <video id="video" autoplay playsinline muted></video>
-          <canvas id="overlay"></canvas>
-          <div id="status" class="status">Idle</div>
-          <div id="notice" class="notice hidden"></div>
-          <div id="badge" class="badge hidden">!</div>
-          <div id="veil" class="veil hidden"></div>
-          <div id="cursor" class="cursor hidden"></div>
-        </div>
-
-        <div class="controls">
+      <div class="main-content">
+        <!-- Left: Video Area -->
+        <section class="panel video-panel">
+          <div class="video-area">
+            <video id="video" autoplay playsinline muted></video>
+            <canvas id="overlay"></canvas>
+            <div id="status" class="status">Idle</div>
+            <div id="notice" class="notice hidden"></div>
+            <div id="badge" class="badge hidden">!</div>
+            <div id="veil" class="veil hidden"></div>
+            <div id="cursor" class="cursor hidden"></div>
+            <!-- Loading overlay -->
+            <div id="loadingOverlay" class="loading-overlay hidden">
+              <div class="loading-content">
+                <div id="loadingText" class="loading-text">Initializing...</div>
+                <div id="countdownDisplay" class="countdown-display hidden">3</div>
+              </div>
+            </div>
+          </div>
           <p class="privacy">
             Webcam processing occurs entirely in your browser. No data is uploaded.
           </p>
-          <div class="instructions">
+        </section>
+
+        <!-- Right: Sidebar -->
+        <aside class="sidebar">
+          <div class="sidebar-section">
+            <div id="timer" class="timer">00:00.000</div>
+            <button id="startBtn">Begin Assessment [Space]</button>
+          </div>
+
+          <div class="sidebar-section instructions">
             <h2>Protocol</h2>
             <ul>
               <li>Eyes in zone. Expression appropriate. Expectations may change.</li>
             </ul>
           </div>
-          <button id="startBtn">Begin Assessment [Space]</button>
-          <div id="timer" class="timer">00:00.000</div>
-          <div id="prompt" class="prompt"></div>
-        </div>
-      </section>
 
-      <section class="panel leaderboard">
-        <div class="score-entry hidden" id="scoreEntry">
-          <label for="playerName">Subject Identifier</label>
-          <input id="playerName" maxlength="24" placeholder="SUBJECT" />
-          <button id="submitScore">Submit Record</button>
-        </div>
-        <h2>Compliance Records</h2>
-        <ol id="scores"></ol>
-      </section>
+          <div id="prompt" class="prompt"></div>
+
+          <!-- Debug tracking values -->
+          <div id="debugPanel" class="debug-panel hidden">
+            <h3>Tracking</h3>
+            <div id="debugValues" class="debug-values"></div>
+          </div>
+
+          <div class="sidebar-section leaderboard">
+            <div class="score-entry hidden" id="scoreEntry">
+              <label for="playerName">Subject Identifier</label>
+              <input id="playerName" maxlength="24" placeholder="SUBJECT" />
+              <button id="submitScore">Submit Record</button>
+            </div>
+            <h2>Compliance Records</h2>
+            <ol id="scores"></ol>
+          </div>
+        </aside>
+      </div>
 
     </main>
 
