@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Maintain</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="screen">
+      <header class="header">
+        <h1>Maintain</h1>
+        <p class="subtitle">Remain present.</p>
+      </header>
+
+      <section class="panel">
+        <div class="video-area">
+          <video id="video" autoplay playsinline muted></video>
+          <canvas id="overlay"></canvas>
+          <div id="status" class="status">Idle</div>
+          <div id="notice" class="notice hidden"></div>
+        </div>
+
+        <div class="controls">
+          <p class="privacy">
+            Webcam processing happens entirely in your browser. No video or images are uploaded or stored.
+          </p>
+          <button id="startBtn">Start</button>
+          <div id="timer" class="timer">00:00.000</div>
+          <div id="prompt" class="prompt"></div>
+        </div>
+      </section>
+
+      <section class="panel leaderboard">
+        <div class="score-entry hidden" id="scoreEntry">
+          <label for="playerName">Name</label>
+          <input id="playerName" maxlength="24" placeholder="SYSTEM" />
+          <button id="submitScore">Submit</button>
+        </div>
+        <h2>Leaderboard</h2>
+        <ol id="scores"></ol>
+      </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-landmarks-detection"></script>
+    <script src="main.js"></script>
+  </body>
+</html>
