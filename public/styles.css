@@ -12,29 +12,34 @@
 body {
   margin: 0;
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
-  justify-content: flex-start;
-  align-items: center;
-  padding: 16px;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 12px;
   background: linear-gradient(180deg, #080d14 0%, #050a10 50%, #030508 100%);
+  overflow-x: hidden;
 }
 
 .screen {
-  width: min(1100px, 100%);
+  width: 100%;
+  max-width: 1400px;
   display: grid;
   gap: 12px;
+  transition: transform 0.1s ease-out;
 }
 
+/* Header */
 .header {
   display: flex;
   align-items: baseline;
-  gap: 16px;
+  gap: 12px;
   flex-wrap: wrap;
 }
 
 .header h1 {
   margin: 0;
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   font-weight: 600;
@@ -44,7 +49,7 @@ body {
 .subtitle {
   margin: 0;
   color: #8a9aac;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   letter-spacing: 0.04em;
 }
 
@@ -52,18 +57,33 @@ body {
   margin: 0;
   margin-left: auto;
   color: #c49a4a;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-weight: 500;
 }
 
+/* Main content: Landscape layout */
+.main-content {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 12px;
+  align-items: start;
+}
+
 .panel {
   background: #0a1018;
   border: 1px solid #1a2530;
-  padding: 12px;
+  padding: 10px;
   border-radius: 4px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+/* Video Panel */
+.video-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .video-area {
@@ -91,12 +111,12 @@ video,
 
 .status {
   position: absolute;
-  top: 10px;
-  left: 10px;
-  padding: 5px 10px;
+  top: 8px;
+  left: 8px;
+  padding: 4px 8px;
   background: rgba(5, 10, 16, 0.9);
   border: 1px solid #2a3a4a;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   border-radius: 2px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -105,12 +125,12 @@ video,
 
 .notice {
   position: absolute;
-  bottom: 12px;
-  right: 12px;
-  padding: 8px 14px;
+  bottom: 10px;
+  right: 10px;
+  padding: 6px 12px;
   background: rgba(10, 16, 24, 0.95);
   border: 1px solid #c49a4a;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: #c49a4a;
@@ -122,70 +142,97 @@ video,
   display: none;
 }
 
-.controls {
-  margin-top: 10px;
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 8px 16px;
-  align-items: center;
-}
-
-.controls .privacy {
-  grid-column: 1 / -1;
-}
-
-.controls .instructions {
-  grid-column: 1 / -1;
-}
-
-.controls .prompt {
-  grid-column: 1 / -1;
-}
-
 .privacy {
   margin: 0;
   color: #6a7a8a;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   font-style: italic;
 }
 
-.instructions {
-  border: 1px solid #1a2530;
-  border-radius: 2px;
-  padding: 12px;
-  background: rgba(5, 10, 16, 0.5);
+/* Loading Overlay */
+.loading-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(5, 10, 16, 0.95);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 20;
 }
 
-.instructions h2 {
-  margin: 0 0 8px;
-  font-size: 0.85rem;
+.loading-overlay.hidden {
+  display: none;
+}
+
+.loading-content {
+  text-align: center;
+}
+
+.loading-text {
+  font-size: 1rem;
   color: #8a9aac;
-  letter-spacing: 0.08em;
   text-transform: uppercase;
-  font-weight: 500;
+  letter-spacing: 0.1em;
+  margin-bottom: 12px;
 }
 
-.instructions ul {
-  margin: 0;
-  padding-left: 18px;
-  color: #a0aab8;
-  display: grid;
-  gap: 4px;
-  font-size: 0.85rem;
+.countdown-display {
+  font-size: 4rem;
+  font-weight: 700;
+  color: #c49a4a;
+  font-family: "Consolas", "Monaco", monospace;
+  animation: pulse 1s ease-in-out infinite;
 }
 
-.instructions li {
-  color: #a0aab8;
+.countdown-display.hidden {
+  display: none;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.1);
+  }
+}
+
+/* Sidebar */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sidebar-section {
+  background: #0a1018;
+  border: 1px solid #1a2530;
+  padding: 10px;
+  border-radius: 4px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.timer {
+  font-size: 1.5rem;
+  letter-spacing: 0.1em;
+  color: #c49a4a;
+  font-family: "Consolas", "Monaco", monospace;
+  font-weight: 400;
+  text-align: center;
+  margin-bottom: 10px;
 }
 
 button {
+  width: 100%;
   background: #12202e;
   color: #c8d0dc;
   border: 1px solid #2a3a4a;
-  padding: 10px 16px;
+  padding: 10px 14px;
   border-radius: 2px;
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   font-weight: 500;
@@ -212,28 +259,102 @@ button:disabled {
   cursor: not-allowed;
 }
 
-.timer {
-  font-size: 1.5rem;
-  letter-spacing: 0.1em;
-  color: #c49a4a;
-  font-family: "Consolas", "Monaco", monospace;
-  font-weight: 400;
+/* Instructions */
+.instructions {
+  border: 1px solid #1a2530;
+  border-radius: 2px;
+  padding: 10px;
+  background: rgba(5, 10, 16, 0.5);
 }
 
+.instructions h2 {
+  margin: 0 0 6px;
+  font-size: 0.8rem;
+  color: #8a9aac;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.instructions ul {
+  margin: 0;
+  padding-left: 16px;
+  color: #a0aab8;
+  display: grid;
+  gap: 4px;
+  font-size: 0.8rem;
+}
+
+.instructions li {
+  color: #a0aab8;
+}
+
+/* Prompt */
 .prompt {
   color: #a0aab8;
   min-height: 1.2rem;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
+  padding: 0 4px;
 }
 
+/* Debug Panel */
+.debug-panel {
+  background: rgba(10, 20, 10, 0.8);
+  border: 1px solid #2a4a2a;
+  border-radius: 2px;
+  padding: 8px;
+}
+
+.debug-panel.hidden {
+  display: none;
+}
+
+.debug-panel h3 {
+  margin: 0 0 6px;
+  font-size: 0.7rem;
+  color: #6a9a6a;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.debug-values {
+  font-family: "Consolas", "Monaco", monospace;
+  font-size: 0.7rem;
+  color: #8aba8a;
+  line-height: 1.4;
+}
+
+.debug-values .debug-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.debug-values .debug-label {
+  color: #6a8a6a;
+}
+
+.debug-values .debug-value {
+  color: #aadaaa;
+}
+
+.debug-values .debug-value.warning {
+  color: #daca6a;
+}
+
+.debug-values .debug-value.danger {
+  color: #da6a6a;
+}
+
+/* Leaderboard */
 .leaderboard {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .leaderboard h2 {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
   color: #8a9aac;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -242,16 +363,14 @@ button:disabled {
 
 .score-entry {
   display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 10px;
-  align-items: center;
-  padding-bottom: 12px;
+  gap: 8px;
+  padding-bottom: 10px;
   border-bottom: 1px solid #1a2530;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .score-entry label {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   color: #6a7a8a;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -267,7 +386,7 @@ button:disabled {
   border: 1px solid #2a3a4a;
   background: #0a1018;
   color: #c8d0dc;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-family: inherit;
 }
 
@@ -282,15 +401,15 @@ button:disabled {
 }
 
 ol {
-  padding-left: 20px;
+  padding-left: 18px;
   margin: 0;
   display: grid;
-  gap: 6px;
+  gap: 4px;
 }
 
 li {
   color: #a0aab8;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
 }
 
 li strong {
@@ -300,24 +419,25 @@ li strong {
 
 .classification {
   color: #6a7a8a;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   font-style: italic;
 }
 
+/* Badge */
 .badge {
   position: absolute;
-  top: 10px;
-  right: 10px;
-  min-width: 24px;
-  height: 24px;
-  padding: 0 6px;
-  border-radius: 12px;
+  top: 8px;
+  right: 8px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 5px;
+  border-radius: 11px;
   background: #c49a4a;
   color: #0a1018;
   display: grid;
   place-items: center;
   font-weight: 700;
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   box-shadow: 0 0 8px rgba(196, 154, 74, 0.5);
 }
 
@@ -325,6 +445,7 @@ li strong {
   display: none;
 }
 
+/* Veil animation */
 .veil {
   position: absolute;
   inset: 0;
@@ -359,10 +480,11 @@ li strong {
   }
 }
 
+/* Cursor distraction */
 .cursor {
   position: absolute;
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   border: 2px solid #c49a4a;
   box-shadow: 0 0 6px rgba(196, 154, 74, 0.4);
@@ -374,19 +496,265 @@ li strong {
   display: none;
 }
 
-.footer {
-  text-align: center;
-  padding: 12px 0 0;
+/* ===== RESPONSIVE: Mobile Portrait ===== */
+@media (max-width: 768px) {
+  body {
+    padding: 8px;
+    align-items: flex-start;
+  }
+
+  .screen {
+    gap: 8px;
+  }
+
+  .header {
+    gap: 8px;
+  }
+
+  .header h1 {
+    font-size: 1rem;
+  }
+
+  .subtitle {
+    font-size: 0.7rem;
+  }
+
+  .meta {
+    font-size: 0.65rem;
+  }
+
+  /* Stack vertically on mobile */
+  .main-content {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .panel {
+    padding: 8px;
+  }
+
+  .video-area {
+    aspect-ratio: 4 / 3;
+  }
+
+  .privacy {
+    font-size: 0.65rem;
+  }
+
+  /* Sidebar becomes stacked sections */
+  .sidebar {
+    gap: 8px;
+  }
+
+  .sidebar-section {
+    padding: 8px;
+  }
+
+  .timer {
+    font-size: 1.25rem;
+    margin-bottom: 8px;
+  }
+
+  button {
+    padding: 8px 12px;
+    font-size: 0.8rem;
+  }
+
+  .instructions h2 {
+    font-size: 0.75rem;
+  }
+
+  .instructions ul {
+    font-size: 0.75rem;
+    padding-left: 14px;
+  }
+
+  .prompt {
+    font-size: 0.8rem;
+  }
+
+  .debug-panel {
+    padding: 6px;
+  }
+
+  .debug-panel h3 {
+    font-size: 0.65rem;
+  }
+
+  .debug-values {
+    font-size: 0.65rem;
+  }
+
+  .leaderboard h2 {
+    font-size: 0.75rem;
+  }
+
+  .score-entry label {
+    font-size: 0.7rem;
+  }
+
+  #playerName {
+    padding: 6px 8px;
+    font-size: 0.8rem;
+  }
+
+  ol {
+    padding-left: 14px;
+    gap: 3px;
+  }
+
+  li {
+    font-size: 0.75rem;
+  }
+
+  .classification {
+    font-size: 0.7rem;
+  }
+
+  .loading-text {
+    font-size: 0.9rem;
+  }
+
+  .countdown-display {
+    font-size: 3rem;
+  }
 }
 
-.footer p {
-  margin: 0;
-  color: #4a5a6a;
-  font-size: 0.75rem;
-  letter-spacing: 0.04em;
+/* ===== RESPONSIVE: Landscape on small screens (phones in landscape) ===== */
+@media (max-height: 500px) and (orientation: landscape) {
+  body {
+    padding: 6px;
+  }
+
+  .screen {
+    gap: 6px;
+  }
+
+  .header {
+    display: none;
+  }
+
+  .main-content {
+    grid-template-columns: 1fr 220px;
+    gap: 6px;
+  }
+
+  .panel {
+    padding: 6px;
+  }
+
+  .video-area {
+    aspect-ratio: 16 / 9;
+  }
+
+  .privacy {
+    display: none;
+  }
+
+  .sidebar {
+    gap: 6px;
+    max-height: calc(100vh - 12px);
+    overflow-y: auto;
+  }
+
+  .sidebar-section {
+    padding: 6px;
+  }
+
+  .timer {
+    font-size: 1.1rem;
+    margin-bottom: 6px;
+  }
+
+  button {
+    padding: 6px 10px;
+    font-size: 0.75rem;
+  }
+
+  .instructions {
+    padding: 6px;
+  }
+
+  .instructions h2 {
+    font-size: 0.7rem;
+    margin-bottom: 4px;
+  }
+
+  .instructions ul {
+    font-size: 0.7rem;
+    padding-left: 12px;
+  }
+
+  .prompt {
+    font-size: 0.75rem;
+    min-height: 1rem;
+  }
+
+  .debug-panel {
+    padding: 4px 6px;
+  }
+
+  .debug-panel h3 {
+    font-size: 0.6rem;
+    margin-bottom: 4px;
+  }
+
+  .debug-values {
+    font-size: 0.6rem;
+    line-height: 1.3;
+  }
+
+  .leaderboard h2 {
+    font-size: 0.7rem;
+  }
+
+  ol {
+    padding-left: 12px;
+    gap: 2px;
+  }
+
+  li {
+    font-size: 0.7rem;
+  }
+
+  .score-entry {
+    gap: 4px;
+    padding-bottom: 6px;
+  }
+
+  .score-entry label {
+    font-size: 0.65rem;
+  }
+
+  #playerName {
+    padding: 4px 6px;
+    font-size: 0.75rem;
+  }
+
+  .loading-text {
+    font-size: 0.85rem;
+  }
+
+  .countdown-display {
+    font-size: 2.5rem;
+  }
 }
 
-/* Screen shake support */
-.screen {
-  transition: transform 0.1s ease-out;
+/* ===== RESPONSIVE: Large landscape screens ===== */
+@media (min-width: 1200px) {
+  .main-content {
+    grid-template-columns: 1fr 320px;
+  }
+
+  .timer {
+    font-size: 1.75rem;
+  }
+
+  .instructions ul {
+    font-size: 0.85rem;
+  }
+
+  li {
+    font-size: 0.85rem;
+  }
 }

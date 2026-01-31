@@ -12,6 +12,25 @@ const scoreEntry = document.getElementById('scoreEntry');
 const playerName = document.getElementById('playerName');
 const submitScore = document.getElementById('submitScore');
 const scoresList = document.getElementById('scores');
+const loadingOverlay = document.getElementById('loadingOverlay');
+const loadingText = document.getElementById('loadingText');
+const countdownDisplay = document.getElementById('countdownDisplay');
+const debugPanel = document.getElementById('debugPanel');
+const debugValues = document.getElementById('debugValues');
+
+// Debug mode - always show tracking info
+const DEBUG_MODE = true;
+
+// Console logging helper
+function log(category, message, data = null) {
+  const timestamp = performance.now().toFixed(2);
+  const prefix = `[${timestamp}ms] [${category}]`;
+  if (data) {
+    console.log(prefix, message, data);
+  } else {
+    console.log(prefix, message);
+  }
+}
 
 // Configuration constants
 const CONFIG = {
@@ -32,8 +51,13 @@ const CONFIG = {
   POLICY_CHANGE_MIN_MS: 20000,     // First policy change after 20s
   POLICY_CHANGE_MAX_MS: 35000,
   ZONE_DRIFT_SPEED: 0.0002,        // Slower drift
-  ZONE_DRIFT_MAX: 0.06
+  ZONE_DRIFT_MAX: 0.06,
+  // Loading and countdown
+  LOADING_MIN_MS: 1500,            // Minimum loading time to show message
+  COUNTDOWN_SECONDS: 3             // Countdown before calibration starts
 };
+
+log('CONFIG', 'Configuration loaded', CONFIG);
 
 // Audio context for notification sounds
 let audioCtx = null;
@@ -415,7 +439,13 @@ const state = {
   lastMessageTime: 0,
   // Gaslighting state
   lastGaslightTime: 0,
-  contradictionPending: false
+  contradictionPending: false,
+  // Debug tracking
+  lastDebugUpdate: 0,
+  currentDebugData: null,
+  // Frame counting for debug
+  frameCount: 0,
+  faceDetectionCount: 0
 };
 
 function getRandomMessage(category) {
@@ -439,6 +469,7 @@ function getFailureMessage(type) {
 
 function setStatus(text) {
   statusLabel.textContent = text;
+  log('STATUS', text);
 }
 
 function setPrompt(text) {
@@ -499,8 +530,8 @@ function drawZone(ctx, width, height) {
   ctx.setLineDash([]);
 }
 
-// Debug display for tracking values
-function drawDebug(ctx, width, data) {
+// Debug display on canvas (kept for overlay visualization)
+function drawDebugCanvas(ctx, width, height, data) {
   ctx.font = '12px monospace';
   ctx.fillStyle = 'rgba(200, 220, 200, 0.9)';
   const lines = [
@@ -513,6 +544,70 @@ function drawDebug(ctx, width, data) {
   lines.forEach((line, i) => {
     ctx.fillText(line, 10, height - 70 + i * 14);
   });
+}
+
+// Update the sidebar debug panel with tracking values
+function updateDebugPanel(data) {
+  if (!DEBUG_MODE || !debugPanel || !debugValues) return;
+
+  debugPanel.classList.remove('hidden');
+
+  const gazePercent = Math.min(100, (state.gazeAwayMs / CONFIG.GAZE_AWAY_LIMIT_MS) * 100);
+  const eyeDriftPercent = Math.min(100, state.eyeDrift * 100);
+  const smileDriftPercent = Math.min(100, state.smileDrift * 100);
+  const livenessDriftPercent = Math.min(100, state.livenessDrift * 100);
+  const eyesClosedPercent = Math.min(100, (state.eyesClosedMs / CONFIG.EYES_CLOSED_LIMIT_MS) * 100);
+
+  const getClass = (percent) => {
+    if (percent > 75) return 'danger';
+    if (percent > 50) return 'warning';
+    return '';
+  };
+
+  debugValues.innerHTML = `
+    <div class="debug-line">
+      <span class="debug-label">Zone:</span>
+      <span class="debug-value ${data.inZone ? '' : 'warning'}">${data.inZone ? 'IN' : 'OUT'}</span>
+    </div>
+    <div class="debug-line">
+      <span class="debug-label">Gaze Away:</span>
+      <span class="debug-value ${getClass(gazePercent)}">${(state.gazeAwayMs / 1000).toFixed(1)}s / ${(CONFIG.GAZE_AWAY_LIMIT_MS / 1000).toFixed(1)}s</span>
+    </div>
+    <div class="debug-line">
+      <span class="debug-label">Eye Drift:</span>
+      <span class="debug-value ${getClass(eyeDriftPercent)}">${eyeDriftPercent.toFixed(0)}%</span>
+    </div>
+    <div class="debug-line">
+      <span class="debug-label">Smile:</span>
+      <span class="debug-value ${data.smileRatio > CONFIG.SMILE_THRESHOLD * 0.8 ? '' : 'warning'}">${data.smileRatio.toFixed(2)}</span>
+    </div>
+    <div class="debug-line">
+      <span class="debug-label">Smile Drift:</span>
+      <span class="debug-value ${getClass(smileDriftPercent)}">${smileDriftPercent.toFixed(0)}%</span>
+    </div>
+    <div class="debug-line">
+      <span class="debug-label">Liveness:</span>
+      <span class="debug-value ${getClass(livenessDriftPercent)}">${livenessDriftPercent.toFixed(0)}%</span>
+    </div>
+    <div class="debug-line">
+      <span class="debug-label">Eyes Closed:</span>
+      <span class="debug-value ${getClass(eyesClosedPercent)}">${(state.eyesClosedMs / 1000).toFixed(1)}s</span>
+    </div>
+    <div class="debug-line">
+      <span class="debug-label">Eye Open:</span>
+      <span class="debug-value">${data.eyeOpenness.toFixed(4)}</span>
+    </div>
+    <div class="debug-line">
+      <span class="debug-label">Phase:</span>
+      <span class="debug-value">${state.escalationPhase}</span>
+    </div>
+    <div class="debug-line">
+      <span class="debug-label">Frames:</span>
+      <span class="debug-value">${state.frameCount} / ${state.faceDetectionCount} det</span>
+    </div>
+  `;
+
+  state.currentDebugData = data;
 }
 
 function updateTimer(now) {
@@ -561,6 +656,8 @@ function updatePolicy(now) {
   state.policyHistory.push(state.currentPolicy.name);
   state.currentPolicy = newPolicy;
   state.lastPolicyChange = now;
+
+  log('POLICY', `Changed to ${newPolicy.name}`);
 
   // Schedule next policy change (faster in later phases)
   const phaseMultiplier = state.escalationPhase === 3 ? 0.5 : state.escalationPhase === 2 ? 0.75 : 1;
@@ -721,6 +818,7 @@ function scheduleDistractions() {
 }
 
 function resetMetrics(now) {
+  log('METRICS', 'Resetting all metrics');
   state.eyeDrift = 0;
   state.smileDrift = 0;
   state.livenessDrift = 0;
@@ -740,12 +838,16 @@ function resetMetrics(now) {
   state.lastMessageTime = 0;
   state.lastGaslightTime = 0;
   state.contradictionPending = false;
+  state.frameCount = 0;
+  state.faceDetectionCount = 0;
   initPolicy(now);
 }
 
 async function initDetector() {
+  log('DETECTOR', 'Initializing TensorFlow backend...');
   await tf.setBackend('webgl');
   await tf.ready();
+  log('DETECTOR', 'TensorFlow ready, creating face detector...');
   return faceLandmarksDetection.createDetector(
     faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh,
     {
@@ -755,15 +857,57 @@ async function initDetector() {
   );
 }
 
+// Show loading overlay
+function showLoading(text) {
+  loadingOverlay.classList.remove('hidden');
+  loadingText.textContent = text;
+  loadingText.classList.remove('hidden');
+  countdownDisplay.classList.add('hidden');
+}
+
+// Hide loading overlay
+function hideLoading() {
+  loadingOverlay.classList.add('hidden');
+}
+
+// Run countdown before calibration
+async function runCountdown() {
+  return new Promise((resolve) => {
+    loadingText.classList.add('hidden');
+    countdownDisplay.classList.remove('hidden');
+
+    let count = CONFIG.COUNTDOWN_SECONDS;
+    countdownDisplay.textContent = count;
+
+    const interval = setInterval(() => {
+      count--;
+      if (count > 0) {
+        countdownDisplay.textContent = count;
+        playPing(440 + (CONFIG.COUNTDOWN_SECONDS - count) * 110, 0.1, 0.1);
+      } else {
+        clearInterval(interval);
+        playPing(880, 0.15, 0.15);
+        resolve();
+      }
+    }, 1000);
+  });
+}
+
 async function startGame() {
   startBtn.disabled = true;
-  setStatus('Requesting webcam');
   setPrompt('');
   timerLabel.textContent = formatTime(0);
   state.zoneCache = null;
 
+  log('GAME', '=== Starting new game ===');
+
+  // Show loading overlay
+  showLoading('Requesting webcam...');
+  setStatus('Requesting webcam');
+
   try {
     if (!video.srcObject) {
+      log('WEBCAM', 'Requesting getUserMedia...');
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: 'user',
@@ -772,8 +916,10 @@ async function startGame() {
         }
       });
       video.srcObject = stream;
+      log('WEBCAM', 'Stream obtained', { tracks: stream.getTracks().length });
     }
   } catch (err) {
+    log('ERROR', 'Webcam error', { name: err.name, message: err.message });
     let errorMsg = 'Webcam access denied.';
     if (err.name === 'NotFoundError') {
       errorMsg = 'No webcam detected.';
@@ -784,21 +930,37 @@ async function startGame() {
     }
     setStatus('Error');
     setPrompt(errorMsg);
+    hideLoading();
     startBtn.disabled = false;
     startBtn.textContent = 'Retry';
     return;
   }
 
+  showLoading('Initializing camera...');
   setStatus('Initializing camera');
+
+  log('WEBCAM', 'Waiting for video metadata...');
   await new Promise((resolve) => {
-    video.onloadedmetadata = () => resolve();
+    if (video.readyState >= 1) {
+      resolve();
+    } else {
+      video.onloadedmetadata = () => resolve();
+    }
   });
 
   try {
+    log('WEBCAM', 'Starting video playback...');
     await video.play();
+    log('WEBCAM', 'Video playing', {
+      width: video.videoWidth,
+      height: video.videoHeight,
+      readyState: video.readyState
+    });
   } catch (err) {
+    log('ERROR', 'Video playback error', { name: err.name, message: err.message });
     setStatus('Error');
     setPrompt('Failed to start video playback.');
+    hideLoading();
     startBtn.disabled = false;
     startBtn.textContent = 'Retry';
     return;
@@ -806,15 +968,20 @@ async function startGame() {
 
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
+  log('CANVAS', 'Canvas sized', { width: canvas.width, height: canvas.height });
 
   if (!state.detector) {
+    showLoading('Loading face detection model...');
     setStatus('Loading model...');
     setPrompt('Preparing assessment environment.');
     try {
       state.detector = await initDetector();
+      log('DETECTOR', 'Face detector ready');
     } catch (err) {
+      log('ERROR', 'Detector init error', { name: err.name, message: err.message });
       setStatus('Error');
       setPrompt('Failed to load face detection model.');
+      hideLoading();
       startBtn.disabled = false;
       startBtn.textContent = 'Retry';
       return;
@@ -823,6 +990,38 @@ async function startGame() {
 
   initAudio();
 
+  // Do a test face detection to warm up the model
+  showLoading('Warming up detection...');
+  setStatus('Preparing...');
+
+  try {
+    log('DETECTOR', 'Running warmup detection...');
+    const warmupStart = performance.now();
+    const testFaces = await state.detector.estimateFaces(video, { flipHorizontal: false });
+    const warmupTime = performance.now() - warmupStart;
+    log('DETECTOR', `Warmup complete in ${warmupTime.toFixed(0)}ms`, { facesFound: testFaces.length });
+
+    if (testFaces.length === 0) {
+      log('WARNING', 'No face detected during warmup - this may cause early failure');
+    }
+  } catch (err) {
+    log('ERROR', 'Warmup detection failed', { name: err.name, message: err.message });
+  }
+
+  // Show "Get Ready" message
+  showLoading('Get Ready!');
+  setStatus('Get Ready');
+  setPrompt('Position your face in the center of the screen.');
+
+  // Wait a moment, then countdown
+  await new Promise(r => setTimeout(r, 1000));
+
+  // Run countdown
+  await runCountdown();
+
+  // Hide loading overlay and start calibration
+  hideLoading();
+
   setStatus('Calibrating');
   setPrompt('Hold steady. Face the system.');
   state.phase = 'calibrating';
@@ -830,18 +1029,23 @@ async function startGame() {
   state.lastFaceTime = performance.now();
   state.lastDetectionTime = 0;
   resetMetrics(performance.now());
-  scheduleDistractions();
 
+  log('GAME', 'Calibration phase started');
+
+  // Start the detection loop immediately
+  state.rafId = requestAnimationFrame(loop);
+
+  // Schedule transition to running after calibration
   setTimeout(() => {
     if (state.phase === 'calibrating') {
       state.phase = 'running';
       state.startTime = performance.now();
       setStatus('Assessment Active');
       setPrompt('Your compliance is being evaluated.');
+      log('GAME', '=== Assessment started ===');
+      scheduleDistractions();
     }
   }, CONFIG.CALIBRATION_MS);
-
-  state.rafId = requestAnimationFrame(loop);
 }
 
 function getPoint(keypoints, index) {
@@ -906,7 +1110,20 @@ function stopVideoStream() {
   }
 }
 
-function failRun(message) {
+function failRun(message, reason = 'unknown') {
+  const elapsed = state.startTime > 0 ? performance.now() - state.startTime : 0;
+  log('FAILURE', `=== GAME OVER: ${reason} ===`, {
+    message,
+    elapsed: elapsed.toFixed(0) + 'ms',
+    eyeDrift: state.eyeDrift.toFixed(3),
+    smileDrift: state.smileDrift.toFixed(3),
+    livenessDrift: state.livenessDrift.toFixed(3),
+    gazeAwayMs: state.gazeAwayMs.toFixed(0),
+    eyesClosedMs: state.eyesClosedMs.toFixed(0),
+    frameCount: state.frameCount,
+    faceDetectionCount: state.faceDetectionCount
+  });
+
   state.failureTime = performance.now();
   state.phase = 'failed';
   setStatus('Assessment Concluded');
@@ -931,6 +1148,11 @@ function failRun(message) {
   startBtn.textContent = 'Retry Assessment';
   scoreEntry.classList.remove('hidden');
   submitScore.disabled = false;
+
+  // Keep debug panel visible after failure
+  if (DEBUG_MODE && state.currentDebugData) {
+    updateDebugPanel(state.currentDebugData);
+  }
 }
 
 async function loop(now) {
@@ -938,6 +1160,8 @@ async function loop(now) {
     state.rafId = null;
     return;
   }
+
+  state.frameCount++;
 
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -968,14 +1192,38 @@ async function loop(now) {
 
   state.processing = true;
   state.lastDetectionTime = now;
-  const faces = await state.detector.estimateFaces(video, { flipHorizontal: false });
+
+  let faces;
+  try {
+    faces = await state.detector.estimateFaces(video, { flipHorizontal: false });
+    state.faceDetectionCount++;
+  } catch (err) {
+    log('ERROR', 'Face detection error', { name: err.name, message: err.message });
+    state.processing = false;
+    state.rafId = requestAnimationFrame(loop);
+    return;
+  }
+
   state.processing = false;
 
   if (!faces.length) {
-    if (now - state.lastFaceTime > CONFIG.FACE_LOST_MS && state.phase === 'running') {
-      failRun('Tracking lost.');
+    const timeSinceFace = now - state.lastFaceTime;
+    log('DETECTION', `No face detected for ${timeSinceFace.toFixed(0)}ms`);
+
+    if (timeSinceFace > CONFIG.FACE_LOST_MS && state.phase === 'running') {
+      failRun('Tracking lost.', 'face_lost');
       return;
     }
+
+    // Update debug panel even when no face
+    if (DEBUG_MODE) {
+      updateDebugPanel({
+        inZone: false,
+        smileRatio: 0,
+        eyeOpenness: 0
+      });
+    }
+
     state.rafId = requestAnimationFrame(loop);
     return;
   }
@@ -1055,8 +1303,15 @@ async function loop(now) {
   const eyeOpenness = getEyeOpenness(leftUpper, leftLower, rightUpper, rightLower, width);
   const eyesClosed = eyeOpenness < CONFIG.EYE_OPENNESS_THRESHOLD;
 
-  // Draw debug info
-  drawDebug(ctx, width, { inZone, smileRatio, eyeOpenness });
+  // Draw debug info on canvas
+  const debugData = { inZone, smileRatio, eyeOpenness };
+  drawDebugCanvas(ctx, width, height, debugData);
+
+  // Update sidebar debug panel
+  if (DEBUG_MODE) {
+    updateDebugPanel(debugData);
+  }
+
   if (eyesClosed) {
     state.lastBlinkTime = now;
     state.eyesClosedMs += dt;
@@ -1076,28 +1331,41 @@ async function loop(now) {
   const eyesClosedLimit = CONFIG.EYES_CLOSED_LIMIT_MS * phaseThresholdMultiplier;
 
   if (state.phase === 'running') {
+    // Log periodic status during running
+    if (state.frameCount % 60 === 0) {
+      log('RUNNING', 'Status check', {
+        elapsed: ((now - state.startTime) / 1000).toFixed(1) + 's',
+        inZone,
+        eyeDrift: state.eyeDrift.toFixed(3),
+        smileDrift: state.smileDrift.toFixed(3),
+        livenessDrift: state.livenessDrift.toFixed(3),
+        gazeAwayMs: state.gazeAwayMs.toFixed(0),
+        eyesClosedMs: state.eyesClosedMs.toFixed(0)
+      });
+    }
+
     if (state.eyeDrift > 1) {
-      failRun(getFailureMessage('gaze'));
+      failRun(getFailureMessage('gaze'), 'eye_drift_exceeded');
       return;
     }
     if (state.gazeAwayMs > gazeLimit) {
-      failRun(getFailureMessage('gaze'));
+      failRun(getFailureMessage('gaze'), 'gaze_away_limit');
       return;
     }
     if (state.smileDrift > 1) {
-      failRun(getFailureMessage('expression'));
+      failRun(getFailureMessage('expression'), 'smile_drift_exceeded');
       return;
     }
     if (state.livenessDrift > 1) {
-      failRun(getFailureMessage('presence'));
+      failRun(getFailureMessage('presence'), 'liveness_drift_exceeded');
       return;
     }
     if (state.eyesClosedMs > eyesClosedLimit) {
-      failRun(getFailureMessage('blink'));
+      failRun(getFailureMessage('blink'), 'eyes_closed_limit');
       return;
     }
     if (state.blinkDrift > 1) {
-      failRun(getFailureMessage('liveness'));
+      failRun(getFailureMessage('liveness'), 'blink_drift_exceeded');
       return;
     }
   }
@@ -1179,6 +1447,12 @@ function handleStart() {
     submitScore.disabled = false;
     startBtn.textContent = 'Begin Assessment';
     state.phase = 'idle';
+
+    // Hide debug panel on new game start
+    if (debugPanel) {
+      debugPanel.classList.add('hidden');
+    }
+
     startGame();
   }
 }
@@ -1218,5 +1492,6 @@ window.addEventListener('beforeunload', () => {
   }
 });
 
+log('INIT', 'Game initialized');
 fetchScores();
 setPrompt('Awaiting subject.');
