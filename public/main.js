@@ -970,6 +970,17 @@ async function startGame() {
   canvas.height = video.videoHeight;
   log('CANVAS', 'Canvas sized', { width: canvas.width, height: canvas.height });
 
+  // Wait for video to have actual frame data
+  log('WEBCAM', 'Waiting for video frames...', { readyState: video.readyState });
+  while (video.readyState < 4) {
+    await new Promise(r => setTimeout(r, 100));
+    log('WEBCAM', 'Still waiting for frames...', { readyState: video.readyState });
+  }
+  log('WEBCAM', 'Video has frames ready', { readyState: video.readyState });
+
+  // Additional delay to ensure frames are rendering
+  await new Promise(r => setTimeout(r, 500));
+
   if (!state.detector) {
     showLoading('Loading face detection model...');
     setStatus('Loading model...');
@@ -990,22 +1001,54 @@ async function startGame() {
 
   initAudio();
 
-  // Do a test face detection to warm up the model
+  // Do test face detections to warm up the model and verify it works
   showLoading('Warming up detection...');
   setStatus('Preparing...');
 
-  try {
-    log('DETECTOR', 'Running warmup detection...');
-    const warmupStart = performance.now();
-    const testFaces = await state.detector.estimateFaces(video, { flipHorizontal: false });
-    const warmupTime = performance.now() - warmupStart;
-    log('DETECTOR', `Warmup complete in ${warmupTime.toFixed(0)}ms`, { facesFound: testFaces.length });
+  // Draw a test frame to canvas to verify video is working
+  const testCtx = canvas.getContext('2d');
+  testCtx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  const testImageData = testCtx.getImageData(0, 0, 10, 10);
+  const hasPixelData = testImageData.data.some(v => v > 0);
+  log('WEBCAM', 'Video frame test', {
+    hasPixelData,
+    samplePixels: Array.from(testImageData.data.slice(0, 16))
+  });
+  testCtx.clearRect(0, 0, canvas.width, canvas.height);
 
-    if (testFaces.length === 0) {
-      log('WARNING', 'No face detected during warmup - this may cause early failure');
+  // Try warmup detection multiple times
+  let warmupFaces = [];
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    try {
+      log('DETECTOR', `Warmup detection attempt ${attempt}/5...`);
+      const warmupStart = performance.now();
+      warmupFaces = await state.detector.estimateFaces(video, { flipHorizontal: false });
+      const warmupTime = performance.now() - warmupStart;
+      log('DETECTOR', `Warmup attempt ${attempt} complete in ${warmupTime.toFixed(0)}ms`, {
+        facesFound: warmupFaces.length
+      });
+
+      if (warmupFaces.length > 0) {
+        log('DETECTOR', 'Face found during warmup!', {
+          box: warmupFaces[0].box,
+          keypointsCount: warmupFaces[0].keypoints?.length
+        });
+        break;
+      }
+
+      // Wait before retry
+      await new Promise(r => setTimeout(r, 300));
+    } catch (err) {
+      log('ERROR', `Warmup attempt ${attempt} failed`, { name: err.name, message: err.message });
     }
-  } catch (err) {
-    log('ERROR', 'Warmup detection failed', { name: err.name, message: err.message });
+  }
+
+  if (warmupFaces.length === 0) {
+    log('WARNING', 'No face detected during warmup after 5 attempts');
+    log('WARNING', 'Check: Is your face visible in the camera? Is lighting adequate?');
+    showLoading('No face detected - check camera');
+    setPrompt('Position your face in the camera view.');
+    await new Promise(r => setTimeout(r, 2000));
   }
 
   // Show "Get Ready" message
