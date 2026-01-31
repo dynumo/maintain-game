@@ -26,9 +26,13 @@ const CONFIG = {
   BLINK_CHECK_INTERVAL_MS: 15000,
   MOVEMENT_WINDOW_MS: 2200,
   MAX_MOVEMENT_SAMPLES: 200,
-  DETECTION_THROTTLE_MS: 33, // ~30fps for face detection
+  DETECTION_THROTTLE_MS: 42, // ~24fps for face detection per spec
   CALIBRATION_MS: 2200,
-  MAX_SCORE_MS: 600000 // 10 minute cap
+  MAX_SCORE_MS: 600000, // 10 minute cap
+  POLICY_CHANGE_MIN_MS: 15000,
+  POLICY_CHANGE_MAX_MS: 30000,
+  ZONE_DRIFT_SPEED: 0.0003,
+  ZONE_DRIFT_MAX: 0.08
 };
 
 // Audio context for notification sounds
@@ -58,8 +62,318 @@ function playPing(frequency = 880, duration = 0.08, volume = 0.15) {
     oscillator.start(ctx.currentTime);
     oscillator.stop(ctx.currentTime + duration);
   } catch (e) {
-    // Audio not supported or blocked, fail silently
+    // Audio not supported or blocked
   }
+}
+
+// Policy States - changes expectations and thresholds
+const POLICIES = {
+  ENGAGEMENT_PRIORITY: {
+    name: 'Engagement Priority',
+    smileMultiplier: 0.7,
+    gazeMultiplier: 1.0,
+    livenessMultiplier: 1.2,
+    announcements: [
+      'Policy update: Engagement metrics active.',
+      'Engagement assessment initiated.',
+      'Your enthusiasm is being evaluated.'
+    ]
+  },
+  PROFESSIONAL_NEUTRALITY: {
+    name: 'Professional Neutrality',
+    smileMultiplier: 1.5, // Punish smiling too much
+    gazeMultiplier: 0.8,
+    livenessMultiplier: 0.9,
+    announcements: [
+      'Policy update: Professional standards in effect.',
+      'Maintain composure.',
+      'Excessive expression noted.'
+    ]
+  },
+  REDUCED_EXPRESSIVENESS: {
+    name: 'Reduced Expressiveness',
+    smileMultiplier: 2.0,
+    gazeMultiplier: 1.1,
+    livenessMultiplier: 0.7,
+    announcements: [
+      'Expression threshold adjusted.',
+      'Reduced display recommended.',
+      'Calibrating to new parameters.'
+    ]
+  },
+  HEIGHTENED_RESPONSIVENESS: {
+    name: 'Heightened Responsiveness',
+    smileMultiplier: 0.5,
+    gazeMultiplier: 1.3,
+    livenessMultiplier: 1.5,
+    announcements: [
+      'Heightened monitoring active.',
+      'Response evaluation in progress.',
+      'Your alertness is being measured.'
+    ]
+  },
+  SUSTAINED_ATTENTION: {
+    name: 'Sustained Attention',
+    smileMultiplier: 1.0,
+    gazeMultiplier: 0.6,
+    livenessMultiplier: 1.0,
+    announcements: [
+      'Attention persistence required.',
+      'Deviation tolerance decreased.',
+      'Focus parameters updated.'
+    ]
+  },
+  BASELINE_COMPLIANCE: {
+    name: 'Baseline Compliance',
+    smileMultiplier: 1.0,
+    gazeMultiplier: 1.0,
+    livenessMultiplier: 1.0,
+    announcements: [
+      'Returning to baseline.',
+      'Standard parameters restored.',
+      'Compliance threshold normalized.'
+    ]
+  }
+};
+
+const POLICY_KEYS = Object.keys(POLICIES);
+
+// System messages organized by category (80-150+ unique messages per spec)
+const MESSAGES = {
+  warning: [
+    'Attention drift detected.',
+    'Expression deviation noted.',
+    'Focus degradation observed.',
+    'Compliance variance recorded.',
+    'Behavioral anomaly flagged.',
+    'Response latency increasing.',
+    'Engagement metrics declining.',
+    'Attention threshold approaching.',
+    'Expression analysis: borderline.',
+    'Movement pattern irregular.',
+    'Eye contact insufficient.',
+    'Posture deviation detected.',
+    'Micro-expression flagged.',
+    'Blink frequency abnormal.',
+    'Gaze stability compromised.',
+    'Attention span fragmenting.',
+    'Expression authenticity: questionable.',
+    'Compliance trajectory: declining.',
+    'Warning: metric threshold imminent.',
+    'Behavioral consistency wavering.'
+  ],
+  notice: [
+    'PAYMENT OVERDUE',
+    'NEW MESSAGE (3)',
+    'CALENDAR: Meeting in 5 min',
+    'SYSTEM ALERT',
+    'SESSION WARNING',
+    'UPDATE REQUIRED',
+    'POLICY UPDATE',
+    'ACTION REQUIRED',
+    'UNREAD MESSAGE (7)',
+    'APPROVAL PENDING',
+    'REVIEW REQUESTED',
+    'DEADLINE APPROACHING',
+    'VERIFICATION NEEDED',
+    'ACCOUNT NOTICE',
+    'COMPLIANCE REMINDER',
+    'MANDATORY TRAINING',
+    'PERFORMANCE REVIEW',
+    'SECURITY ALERT',
+    'SYSTEM MAINTENANCE',
+    'DATA SYNC REQUIRED',
+    'CREDENTIALS EXPIRING',
+    'BENEFITS ENROLLMENT',
+    'TIMESHEET DUE',
+    'EXPENSE REPORT',
+    'INVENTORY CHECK'
+  ],
+  policy: [
+    'Policy parameters adjusting.',
+    'Threshold recalibration in progress.',
+    'Assessment criteria updated.',
+    'Compliance matrix modified.',
+    'Evaluation protocol changing.',
+    'Behavioral expectations shifting.',
+    'Standard operating parameters altered.',
+    'Metric weighting redistributed.',
+    'Performance criteria evolving.',
+    'Baseline expectations recalculated.',
+    'Tolerance thresholds modified.',
+    'Assessment algorithm updated.',
+    'Compliance requirements adjusted.',
+    'Behavioral protocol revised.',
+    'Expectation parameters shifting.'
+  ],
+  contradiction: [
+    'Previous guidance superseded.',
+    'Disregard earlier instruction.',
+    'Correction: opposite behavior expected.',
+    'Error in prior assessment noted.',
+    'Updated: previous metric inverted.',
+    'Recalibrating: prior threshold incorrect.',
+    'Adjustment: earlier feedback reversed.',
+    'Note: previous standard deprecated.',
+    'Override: contradicting prior policy.',
+    'Revision: earlier expectation voided.',
+    'Amendment: prior guidance withdrawn.',
+    'Update: reversing earlier parameters.',
+    'Clarification: opposite now required.',
+    'Correction: prior assessment invalid.',
+    'Notice: earlier instruction rescinded.'
+  ],
+  passive_aggressive: [
+    'That was... noted.',
+    'Interesting choice.',
+    'If you say so.',
+    'Acknowledged.',
+    'As you prefer.',
+    'Compliance within acceptable range. Barely.',
+    'Your performance has been... recorded.',
+    'Engagement remains within tolerance.',
+    'Expression deemed... adequate.',
+    'Noted for your file.',
+    'The system sees you.',
+    'Your effort is appreciated. Formally.',
+    'Acceptable. For now.',
+    'Meeting minimum requirements.',
+    'Your enthusiasm is... registered.',
+    'Behavior logged.',
+    'Attempting compliance. Noted.',
+    'Your presence has been confirmed.',
+    'Satisfactory. Technically.',
+    'Within parameters. Marginally.',
+    'The record will reflect this.',
+    'Your attempt is acknowledged.',
+    'Compliance detected. Proceeding.',
+    'Expression... sufficient.',
+    'Attention... present.'
+  ],
+  terminal: [
+    'Assessment concluded.',
+    'Evaluation terminated.',
+    'Session ended.',
+    'Thank you for your cooperation.',
+    'Your participation has been logged.',
+    'Results have been recorded.',
+    'This session is complete.',
+    'Compliance period ended.',
+    'Your assessment has concluded.',
+    'Processing complete.'
+  ],
+  prompts: [
+    'Remain present.',
+    'Keep your attention forward.',
+    'Maintain the required expression.',
+    'You are being evaluated.',
+    'Continue to demonstrate compliance.',
+    'Your behavior is being analyzed.',
+    'Stay within acceptable parameters.',
+    'Deviation will be recorded.',
+    'Maintain eye contact with the system.',
+    'Expression should remain consistent.',
+    'Focus your attention centrally.',
+    'Your engagement is being measured.',
+    'Do not look away.',
+    'Continue your current behavior.',
+    'Compliance is mandatory.',
+    'Your presence is required.',
+    'Attention must be sustained.',
+    'Expression must be maintained.',
+    'The assessment continues.',
+    'Behavioral consistency required.'
+  ],
+  gaslighting: [
+    'Did you look away just now?',
+    'Your expression changed.',
+    'Was that intentional?',
+    'The system detected something.',
+    'A variance was noted. Or was it?',
+    'Rechecking previous assessment...',
+    'That seemed inconsistent.',
+    'Reviewing your last response...',
+    'Something was flagged. Disregard.',
+    'Anomaly detected. Correction: none detected.',
+    'Your file has been updated. Or has it?',
+    'Prior reading may have been incorrect.',
+    'Recalibrating your baseline...',
+    'Was that expression genuine?',
+    'The system is uncertain about you.'
+  ]
+};
+
+// Failure messages by category
+const FAILURE_MESSAGES = {
+  gaze: [
+    'You seemed disengaged.',
+    'Your attention drifted.',
+    'Eye contact was insufficient.',
+    'Please remain focused.',
+    'That was noted.',
+    'Gaze compliance: failed.',
+    'Attention threshold exceeded.',
+    'Focus was inadequate.'
+  ],
+  expression: [
+    'That expression was inappropriate.',
+    'Expression was insufficient.',
+    'Your demeanor was unsatisfactory.',
+    'Please maintain composure.',
+    'That was... unexpected.',
+    'Expression compliance: failed.',
+    'Affect deviation: excessive.',
+    'Display was inadequate.'
+  ],
+  presence: [
+    'Presence degraded.',
+    'You appeared absent.',
+    'Engagement dropped below threshold.',
+    'Please remain present.',
+    'Activity level was insufficient.',
+    'Presence compliance: failed.',
+    'Engagement threshold exceeded.',
+    'Attendance was inadequate.'
+  ],
+  blink: [
+    'Blink duration exceeded the limit.',
+    'Your eyes were closed too long.',
+    'Prolonged eye closure detected.',
+    'Please keep your eyes open.',
+    'That was concerning.',
+    'Blink compliance: failed.',
+    'Eye closure threshold exceeded.'
+  ],
+  liveness: [
+    'Liveness confirmation failed.',
+    'Movement was insufficient.',
+    'Please demonstrate activity.',
+    'You seemed frozen.',
+    'Natural behavior not detected.',
+    'Liveness compliance: failed.',
+    'Activity threshold not met.'
+  ]
+};
+
+// Classification labels for leaderboard
+const CLASSIFICATIONS = [
+  { maxTime: 5000, label: 'Non-Compliant', note: 'Immediate failure.' },
+  { maxTime: 15000, label: 'Deficient', note: 'Below minimum threshold.' },
+  { maxTime: 30000, label: 'Borderline', note: 'Requires improvement.' },
+  { maxTime: 60000, label: 'Acceptable', note: 'Meets minimum standard.' },
+  { maxTime: 120000, label: 'Compliant', note: 'Within expectations.' },
+  { maxTime: 180000, label: 'Adequately Engaged', note: 'Performance noted.' },
+  { maxTime: 300000, label: 'Satisfactory', note: 'Formally acceptable.' },
+  { maxTime: Infinity, label: 'Exemplary Compliance', note: 'Suspiciously good.' }
+];
+
+function getClassification(timeMs) {
+  for (const c of CLASSIFICATIONS) {
+    if (timeMs <= c.maxTime) {
+      return { label: c.label, note: c.note };
+    }
+  }
+  return CLASSIFICATIONS[CLASSIFICATIONS.length - 1];
 }
 
 const state = {
@@ -81,69 +395,45 @@ const state = {
   processing: false,
   distractions: null,
   distractionLevel: 0,
-  zoneCache: null, // Cached zone drawing
-  rafId: null, // Track animation frame for cleanup
-  failureTime: 0 // Store exact failure time
+  zoneCache: null,
+  rafId: null,
+  failureTime: 0,
+  // Policy system
+  currentPolicy: null,
+  lastPolicyChange: 0,
+  nextPolicyChange: 0,
+  policyHistory: [],
+  // Zone drift
+  zoneDriftX: 0,
+  zoneDriftY: 0,
+  zoneDriftDirX: 1,
+  zoneDriftDirY: 1,
+  // Escalation phase
+  escalationPhase: 1,
+  // Message tracking to avoid repetition
+  usedMessages: new Set(),
+  lastMessageTime: 0,
+  // Gaslighting state
+  lastGaslightTime: 0,
+  contradictionPending: false
 };
 
-const prompts = [
-  'Remain present.',
-  'Keep your attention forward.',
-  'Maintain the required expression.',
-  'You are being evaluated.'
-];
-
-const notices = [
-  'PAYMENT OVERDUE',
-  'NEW MESSAGE',
-  'CALENDAR UPDATE',
-  'SYSTEM ALERT',
-  'SESSION WARNING'
-];
-
-const badges = ['1', '2', '3', '5', '!', '?'];
-
-// Varied failure messages per spec - vague, neutral, mildly passive-aggressive
-const failureMessages = {
-  gaze: [
-    'You seemed disengaged.',
-    'Your attention drifted.',
-    'Eye contact was insufficient.',
-    'Please remain focused.',
-    'That was noted.'
-  ],
-  expression: [
-    'That expression was inappropriate.',
-    'Expression was insufficient.',
-    'Your demeanor was unsatisfactory.',
-    'Please maintain composure.',
-    'That was... unexpected.'
-  ],
-  presence: [
-    'Presence degraded.',
-    'You appeared absent.',
-    'Engagement dropped below threshold.',
-    'Please remain present.',
-    'Activity level was insufficient.'
-  ],
-  blink: [
-    'Blink duration exceeded the limit.',
-    'Your eyes were closed too long.',
-    'Prolonged eye closure detected.',
-    'Please keep your eyes open.',
-    'That was concerning.'
-  ],
-  liveness: [
-    'Liveness confirmation failed.',
-    'Movement was insufficient.',
-    'Please demonstrate activity.',
-    'You seemed frozen.',
-    'Natural behavior not detected.'
-  ]
-};
+function getRandomMessage(category) {
+  const messages = MESSAGES[category] || MESSAGES.prompts;
+  // Try to avoid recently used messages
+  const available = messages.filter(m => !state.usedMessages.has(m));
+  const pool = available.length > 0 ? available : messages;
+  const msg = pool[Math.floor(Math.random() * pool.length)];
+  state.usedMessages.add(msg);
+  // Clear old messages periodically
+  if (state.usedMessages.size > 50) {
+    state.usedMessages.clear();
+  }
+  return msg;
+}
 
 function getFailureMessage(type) {
-  const messages = failureMessages[type] || failureMessages.presence;
+  const messages = FAILURE_MESSAGES[type] || FAILURE_MESSAGES.presence;
   return messages[Math.floor(Math.random() * messages.length)];
 }
 
@@ -163,14 +453,50 @@ function formatTime(ms) {
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(millis).padStart(3, '0')}`;
 }
 
+function getZoneOffset() {
+  return {
+    x: state.zoneDriftX * canvas.width,
+    y: state.zoneDriftY * canvas.height
+  };
+}
+
+function updateZoneDrift(dt) {
+  // Subtle zone drift per spec
+  const speed = CONFIG.ZONE_DRIFT_SPEED * dt;
+  const maxDrift = CONFIG.ZONE_DRIFT_MAX;
+
+  state.zoneDriftX += speed * state.zoneDriftDirX;
+  state.zoneDriftY += speed * state.zoneDriftDirY * 0.7;
+
+  if (Math.abs(state.zoneDriftX) > maxDrift) {
+    state.zoneDriftDirX *= -1;
+    state.zoneDriftX = Math.sign(state.zoneDriftX) * maxDrift;
+  }
+  if (Math.abs(state.zoneDriftY) > maxDrift) {
+    state.zoneDriftDirY *= -1;
+    state.zoneDriftY = Math.sign(state.zoneDriftY) * maxDrift;
+  }
+
+  // Increase drift speed in later phases
+  if (state.escalationPhase >= 2) {
+    state.zoneDriftDirX += (Math.random() - 0.5) * 0.01;
+    state.zoneDriftDirY += (Math.random() - 0.5) * 0.01;
+  }
+}
+
 function drawZone(ctx, width, height) {
+  const offset = getZoneOffset();
   const zoneWidth = width * CONFIG.ZONE_WIDTH_RATIO;
   const zoneHeight = height * CONFIG.ZONE_HEIGHT_RATIO;
-  const x = (width - zoneWidth) / 2;
-  const y = (height - zoneHeight) / 2;
-  ctx.strokeStyle = 'rgba(122, 122, 160, 0.8)';
-  ctx.lineWidth = 2;
+  const x = (width - zoneWidth) / 2 + offset.x;
+  const y = (height - zoneHeight) / 2 + offset.y;
+
+  // Zone is never explicitly shown per spec, but we draw it very subtly
+  ctx.strokeStyle = 'rgba(122, 122, 160, 0.25)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([5, 10]);
   ctx.strokeRect(x, y, zoneWidth, zoneHeight);
+  ctx.setLineDash([]);
 }
 
 function updateTimer(now) {
@@ -181,18 +507,91 @@ function updateTimer(now) {
   timerLabel.textContent = formatTime(elapsed);
 }
 
+// Determine escalation phase based on elapsed time
+function updateEscalationPhase(elapsed) {
+  if (elapsed < 20000) {
+    state.escalationPhase = 1; // Onboarding Pressure
+  } else if (elapsed < 60000) {
+    state.escalationPhase = 2; // Contradiction
+  } else {
+    state.escalationPhase = 3; // Overload
+  }
+}
+
+// Policy system - changes expectations
+function initPolicy(now) {
+  state.currentPolicy = POLICIES.BASELINE_COMPLIANCE;
+  state.lastPolicyChange = now;
+  state.nextPolicyChange = now + CONFIG.POLICY_CHANGE_MIN_MS +
+    Math.random() * (CONFIG.POLICY_CHANGE_MAX_MS - CONFIG.POLICY_CHANGE_MIN_MS);
+  state.policyHistory = [];
+}
+
+function updatePolicy(now) {
+  if (now < state.nextPolicyChange) return;
+
+  const elapsed = now - state.startTime;
+
+  // Don't change policy too early
+  if (elapsed < 10000) return;
+
+  // Select new policy (avoid repeating the same one)
+  let newPolicyKey;
+  do {
+    newPolicyKey = POLICY_KEYS[Math.floor(Math.random() * POLICY_KEYS.length)];
+  } while (POLICIES[newPolicyKey] === state.currentPolicy && POLICY_KEYS.length > 1);
+
+  const newPolicy = POLICIES[newPolicyKey];
+  state.policyHistory.push(state.currentPolicy.name);
+  state.currentPolicy = newPolicy;
+  state.lastPolicyChange = now;
+
+  // Schedule next policy change (faster in later phases)
+  const phaseMultiplier = state.escalationPhase === 3 ? 0.5 : state.escalationPhase === 2 ? 0.75 : 1;
+  const minMs = CONFIG.POLICY_CHANGE_MIN_MS * phaseMultiplier;
+  const maxMs = CONFIG.POLICY_CHANGE_MAX_MS * phaseMultiplier;
+  state.nextPolicyChange = now + minMs + Math.random() * (maxMs - minMs);
+
+  // Announce policy change (vaguely or not at all, per spec)
+  if (Math.random() < 0.6) {
+    const announcement = newPolicy.announcements[Math.floor(Math.random() * newPolicy.announcements.length)];
+    setPrompt(announcement);
+
+    // Sometimes add a contradictory message shortly after
+    if (state.escalationPhase >= 2 && Math.random() < 0.3) {
+      state.contradictionPending = true;
+    }
+  }
+}
+
 function showNotice() {
   if (state.phase !== 'running') {
     notice.classList.add('hidden');
     return;
   }
-  const message = notices[Math.floor(Math.random() * notices.length)];
+  const message = getRandomMessage('notice');
   notice.textContent = message;
   notice.classList.remove('hidden');
-  setTimeout(() => notice.classList.add('hidden'), 1200);
+
+  // Position notice to sometimes overlap face area (attention theft)
+  if (state.escalationPhase >= 2 && Math.random() < 0.3) {
+    notice.style.top = '40%';
+    notice.style.bottom = 'auto';
+    notice.style.left = '50%';
+    notice.style.transform = 'translateX(-50%)';
+  } else {
+    notice.style.top = '';
+    notice.style.bottom = '12px';
+    notice.style.left = '';
+    notice.style.right = '12px';
+    notice.style.transform = '';
+  }
+
+  setTimeout(() => notice.classList.add('hidden'), 1200 + Math.random() * 800);
 }
 
 function showBadge() {
+  const badges = ['1', '2', '3', '5', '7', '!', '?', '99+', 'NEW'];
   badge.textContent = badges[Math.floor(Math.random() * badges.length)];
   badge.classList.remove('hidden');
   setTimeout(() => badge.classList.add('hidden'), 900);
@@ -216,16 +615,72 @@ function showCursor() {
 }
 
 function playNotificationPing() {
-  // Vary the ping sound slightly for different "notification types"
-  const frequencies = [880, 1046, 784, 659];
+  const frequencies = [880, 1046, 784, 659, 523, 698];
   const freq = frequencies[Math.floor(Math.random() * frequencies.length)];
   playPing(freq, 0.1, 0.12);
 }
 
+function showSystemMessage() {
+  const now = performance.now();
+  if (now - state.lastMessageTime < 3000) return;
+  state.lastMessageTime = now;
+
+  // Choose message category based on phase and randomness
+  let category;
+  const roll = Math.random();
+
+  if (state.escalationPhase === 1) {
+    category = roll < 0.4 ? 'prompts' : roll < 0.7 ? 'passive_aggressive' : 'warning';
+  } else if (state.escalationPhase === 2) {
+    if (state.contradictionPending) {
+      category = 'contradiction';
+      state.contradictionPending = false;
+    } else {
+      category = roll < 0.2 ? 'prompts' : roll < 0.4 ? 'contradiction' : roll < 0.7 ? 'warning' : 'gaslighting';
+    }
+  } else {
+    if (state.contradictionPending) {
+      category = 'contradiction';
+      state.contradictionPending = false;
+    } else {
+      category = roll < 0.15 ? 'prompts' : roll < 0.35 ? 'contradiction' : roll < 0.55 ? 'gaslighting' : roll < 0.8 ? 'warning' : 'passive_aggressive';
+    }
+  }
+
+  setPrompt(getRandomMessage(category));
+}
+
+function triggerScreenShake() {
+  if (state.escalationPhase < 2) return;
+  const screen = document.querySelector('.screen');
+  if (!screen) return;
+  screen.style.transform = `translate(${(Math.random() - 0.5) * 4}px, ${(Math.random() - 0.5) * 4}px)`;
+  setTimeout(() => {
+    screen.style.transform = '';
+  }, 100);
+}
+
 function triggerDistraction() {
-  const options = [showNotice, showBadge, showVeil, showCursor, playNotificationPing];
+  const phase = state.escalationPhase;
+
+  // Weight distractions by phase
+  let options;
+  if (phase === 1) {
+    options = [showNotice, showBadge, playNotificationPing, showSystemMessage];
+  } else if (phase === 2) {
+    options = [showNotice, showNotice, showBadge, showVeil, showCursor, playNotificationPing, showSystemMessage, showSystemMessage, triggerScreenShake];
+  } else {
+    options = [showNotice, showNotice, showBadge, showBadge, showVeil, showVeil, showCursor, showCursor, playNotificationPing, playNotificationPing, showSystemMessage, showSystemMessage, showSystemMessage, triggerScreenShake, triggerScreenShake];
+  }
+
   const pick = options[Math.floor(Math.random() * options.length)];
   pick();
+
+  // In phase 3, sometimes trigger multiple distractions
+  if (phase === 3 && Math.random() < 0.4) {
+    const secondPick = options[Math.floor(Math.random() * options.length)];
+    setTimeout(() => secondPick(), 100 + Math.random() * 300);
+  }
 }
 
 function scheduleDistractions() {
@@ -235,14 +690,18 @@ function scheduleDistractions() {
   if (state.phase !== 'running' && state.phase !== 'calibrating') {
     return;
   }
-  const interval = Math.max(2200, 4600 - state.distractionLevel * 260);
-  state.distractionLevel = Math.min(8, state.distractionLevel + 1);
+
+  // Interval decreases with phase and distraction level
+  const baseInterval = state.escalationPhase === 3 ? 1800 : state.escalationPhase === 2 ? 2800 : 4000;
+  const interval = Math.max(800, baseInterval - state.distractionLevel * 150);
+  state.distractionLevel = Math.min(15, state.distractionLevel + 1);
+
   state.distractions = setTimeout(() => {
     if (state.phase === 'running') {
       triggerDistraction();
     }
     scheduleDistractions();
-  }, interval);
+  }, interval + Math.random() * 1000);
 }
 
 function resetMetrics(now) {
@@ -256,6 +715,16 @@ function resetMetrics(now) {
   state.movementSamples = [];
   state.lastPoints = null;
   state.distractionLevel = 0;
+  state.zoneDriftX = 0;
+  state.zoneDriftY = 0;
+  state.zoneDriftDirX = 1;
+  state.zoneDriftDirY = 1;
+  state.escalationPhase = 1;
+  state.usedMessages.clear();
+  state.lastMessageTime = 0;
+  state.lastGaslightTime = 0;
+  state.contradictionPending = false;
+  initPolicy(now);
 }
 
 async function initDetector() {
@@ -275,7 +744,7 @@ async function startGame() {
   setStatus('Requesting webcam');
   setPrompt('');
   timerLabel.textContent = formatTime(0);
-  state.zoneCache = null; // Clear zone cache for fresh start
+  state.zoneCache = null;
 
   try {
     if (!video.srcObject) {
@@ -324,7 +793,7 @@ async function startGame() {
 
   if (!state.detector) {
     setStatus('Loading model...');
-    setPrompt('This may take a moment.');
+    setPrompt('Preparing assessment environment.');
     try {
       state.detector = await initDetector();
     } catch (err) {
@@ -336,11 +805,10 @@ async function startGame() {
     }
   }
 
-  // Initialize audio context on user interaction (required by browsers)
   initAudio();
 
   setStatus('Calibrating');
-  setPrompt('Hold steady. Look at the center box.');
+  setPrompt('Hold steady. Face the system.');
   state.phase = 'calibrating';
   state.lastFrameTime = performance.now();
   state.lastFaceTime = performance.now();
@@ -352,8 +820,8 @@ async function startGame() {
     if (state.phase === 'calibrating') {
       state.phase = 'running';
       state.startTime = performance.now();
-      setStatus('Running');
-      setPrompt(prompts[Math.floor(Math.random() * prompts.length)]);
+      setStatus('Assessment Active');
+      setPrompt('Your compliance is being evaluated.');
     }
   }, CONFIG.CALIBRATION_MS);
 
@@ -386,7 +854,6 @@ function updateMovement(now, nose, leftEye, rightEye, width) {
   const normalized = movement / width;
   state.movementSamples.push({ time: now, value: normalized });
 
-  // Efficiently prune old samples with bounded array size
   const windowMs = CONFIG.MOVEMENT_WINDOW_MS;
   let pruneIndex = 0;
   while (pruneIndex < state.movementSamples.length &&
@@ -397,12 +864,10 @@ function updateMovement(now, nose, leftEye, rightEye, width) {
     state.movementSamples = state.movementSamples.slice(pruneIndex);
   }
 
-  // Hard cap to prevent memory issues
   if (state.movementSamples.length > CONFIG.MAX_MOVEMENT_SAMPLES) {
     state.movementSamples = state.movementSamples.slice(-CONFIG.MAX_MOVEMENT_SAMPLES);
   }
 
-  // Calculate total with cached sum for better performance
   let total = 0;
   for (let i = 0; i < state.movementSamples.length; i++) {
     total += state.movementSamples[i].value;
@@ -426,13 +891,14 @@ function stopVideoStream() {
 }
 
 function failRun(message) {
-  // Store failure time immediately for accurate scoring
   state.failureTime = performance.now();
   state.phase = 'failed';
-  setStatus('Failed');
-  setPrompt(message);
+  setStatus('Assessment Concluded');
 
-  // Clean up resources
+  // Cold, neutral failure message per spec
+  const terminalMessage = getRandomMessage('terminal');
+  setPrompt(message + ' ' + terminalMessage);
+
   stopVideoStream();
 
   if (state.distractions) {
@@ -446,7 +912,7 @@ function failRun(message) {
   }
 
   startBtn.disabled = false;
-  startBtn.textContent = 'Retry';
+  startBtn.textContent = 'Retry Assessment';
   scoreEntry.classList.remove('hidden');
   submitScore.disabled = false;
 }
@@ -460,25 +926,24 @@ async function loop(now) {
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Use cached zone if available, otherwise draw and cache
-  if (state.zoneCache && state.zoneCache.width === canvas.width && state.zoneCache.height === canvas.height) {
-    ctx.drawImage(state.zoneCache, 0, 0);
-  } else {
-    drawZone(ctx, canvas.width, canvas.height);
-    // Cache the zone drawing
-    state.zoneCache = document.createElement('canvas');
-    state.zoneCache.width = canvas.width;
-    state.zoneCache.height = canvas.height;
-    const cacheCtx = state.zoneCache.getContext('2d');
-    drawZone(cacheCtx, canvas.width, canvas.height);
-  }
-
-  updateTimer(now);
-
   const dt = now - state.lastFrameTime;
   state.lastFrameTime = now;
 
-  // Throttle face detection to reduce CPU/GPU usage
+  // Update zone drift
+  if (state.phase === 'running') {
+    updateZoneDrift(dt);
+
+    const elapsed = now - state.startTime;
+    updateEscalationPhase(elapsed);
+    updatePolicy(now);
+  }
+
+  // Draw zone (very subtle, per spec)
+  drawZone(ctx, canvas.width, canvas.height);
+
+  updateTimer(now);
+
+  // Throttle face detection
   const timeSinceLastDetection = now - state.lastDetectionTime;
   if (state.processing || !state.detector || timeSinceLastDetection < CONFIG.DETECTION_THROTTLE_MS) {
     state.rafId = requestAnimationFrame(loop);
@@ -518,12 +983,13 @@ async function loop(now) {
   const width = canvas.width;
   const height = canvas.height;
 
+  // Get zone with drift offset
+  const offset = getZoneOffset();
   const zoneWidth = width * CONFIG.ZONE_WIDTH_RATIO;
   const zoneHeight = height * CONFIG.ZONE_HEIGHT_RATIO;
-  const zoneX = (width - zoneWidth) / 2;
-  const zoneY = (height - zoneHeight) / 2;
+  const zoneX = (width - zoneWidth) / 2 + offset.x;
+  const zoneY = (height - zoneHeight) / 2 + offset.y;
 
-  // Use center point between eyes instead of nose for more accurate gaze detection
   const eyeCenter = {
     x: (leftEye.x + rightEye.x) / 2,
     y: (leftEye.y + rightEye.y) / 2
@@ -535,27 +1001,37 @@ async function loop(now) {
     eyeCenter.y > zoneY &&
     eyeCenter.y < zoneY + zoneHeight;
 
+  // Apply policy multipliers
+  const policy = state.currentPolicy || POLICIES.BASELINE_COMPLIANCE;
+  const gazeMultiplier = policy.gazeMultiplier;
+  const smileMultiplier = policy.smileMultiplier;
+  const livenessMultiplier = policy.livenessMultiplier;
+
   if (inZone) {
     state.eyeDrift = Math.max(0, state.eyeDrift - dt / 600);
     state.gazeAwayMs = Math.max(0, state.gazeAwayMs - dt * 1.4);
   } else {
-    state.eyeDrift += dt / 800;
-    state.gazeAwayMs += dt;
+    state.eyeDrift += (dt / 800) * gazeMultiplier;
+    state.gazeAwayMs += dt * gazeMultiplier;
   }
 
   const mouthWidth = distance(mouthLeft, mouthRight);
   const mouthHeight = distance(upperLip, lowerLip);
   const smileRatio = mouthWidth / Math.max(1, mouthHeight);
 
-  if (smileRatio > CONFIG.SMILE_THRESHOLD) {
+  // Smile threshold can invert based on policy (punish smiling in neutrality mode)
+  const effectiveSmileThreshold = CONFIG.SMILE_THRESHOLD;
+  const smileOk = smileMultiplier < 1 ? smileRatio > effectiveSmileThreshold : smileRatio > effectiveSmileThreshold / smileMultiplier;
+
+  if (smileOk) {
     state.smileDrift = Math.max(0, state.smileDrift - dt / 600);
   } else {
-    state.smileDrift += dt / 1000;
+    state.smileDrift += (dt / 1000) * smileMultiplier;
   }
 
   const movementTotal = updateMovement(now, nose, leftEye, rightEye, width);
   if (movementTotal < CONFIG.MOVEMENT_THRESHOLD) {
-    state.livenessDrift += dt / 1800;
+    state.livenessDrift += (dt / 1800) * livenessMultiplier;
   } else {
     state.livenessDrift = Math.max(0, state.livenessDrift - dt / 600);
   }
@@ -575,12 +1051,17 @@ async function loop(now) {
     state.blinkDrift = Math.max(0, state.blinkDrift - dt / 800);
   }
 
+  // Tighter thresholds in later phases
+  const phaseThresholdMultiplier = state.escalationPhase === 3 ? 0.8 : state.escalationPhase === 2 ? 0.9 : 1.0;
+  const gazeLimit = CONFIG.GAZE_AWAY_LIMIT_MS * phaseThresholdMultiplier;
+  const eyesClosedLimit = CONFIG.EYES_CLOSED_LIMIT_MS * phaseThresholdMultiplier;
+
   if (state.phase === 'running') {
     if (state.eyeDrift > 1) {
       failRun(getFailureMessage('gaze'));
       return;
     }
-    if (state.gazeAwayMs > CONFIG.GAZE_AWAY_LIMIT_MS) {
+    if (state.gazeAwayMs > gazeLimit) {
       failRun(getFailureMessage('gaze'));
       return;
     }
@@ -592,7 +1073,7 @@ async function loop(now) {
       failRun(getFailureMessage('presence'));
       return;
     }
-    if (state.eyesClosedMs > CONFIG.EYES_CLOSED_LIMIT_MS) {
+    if (state.eyesClosedMs > eyesClosedLimit) {
       failRun(getFailureMessage('blink'));
       return;
     }
@@ -622,8 +1103,9 @@ async function fetchScores() {
     }
 
     data.scores.forEach((score) => {
+      const classification = getClassification(score.time_ms);
       const item = document.createElement('li');
-      item.textContent = `${score.name} — ${formatTime(score.time_ms)}`;
+      item.innerHTML = `<strong>${escapeHtml(score.name)}</strong> — ${formatTime(score.time_ms)} <span class="classification">[${classification.label}]</span>`;
       scoresList.appendChild(item);
     });
   } catch (err) {
@@ -634,9 +1116,14 @@ async function fetchScores() {
   }
 }
 
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
 async function submitScoreEntry() {
-  const name = playerName.value.trim() || 'SYSTEM';
-  // Use stored failure time for accuracy, with cap per spec
+  const name = playerName.value.trim() || 'SUBJECT';
   let timeMs = state.failureTime && state.startTime
     ? state.failureTime - state.startTime
     : 0;
@@ -652,12 +1139,12 @@ async function submitScoreEntry() {
 
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
-      setPrompt(data.error || 'Failed to submit score.');
+      setPrompt(data.error || 'Submission failed.');
       submitScore.disabled = false;
       return;
     }
   } catch (err) {
-    setPrompt('Network error. Try again.');
+    setPrompt('Network error.');
     submitScore.disabled = false;
     return;
   }
@@ -671,15 +1158,14 @@ function handleStart() {
   if (state.phase === 'idle' || state.phase === 'failed') {
     scoreEntry.classList.add('hidden');
     submitScore.disabled = false;
-    startBtn.textContent = 'Start';
-    state.phase = 'idle'; // Reset phase before starting
+    startBtn.textContent = 'Begin Assessment';
+    state.phase = 'idle';
     startGame();
   }
 }
 
 startBtn.addEventListener('click', handleStart);
 
-// Keyboard support for start button
 startBtn.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' || e.key === ' ') {
     e.preventDefault();
@@ -689,7 +1175,6 @@ startBtn.addEventListener('keydown', (e) => {
 
 submitScore.addEventListener('click', submitScoreEntry);
 
-// Keyboard support for score submission
 playerName.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
     e.preventDefault();
@@ -699,7 +1184,6 @@ playerName.addEventListener('keydown', (e) => {
   }
 });
 
-// Clean up on page unload
 window.addEventListener('beforeunload', () => {
   stopVideoStream();
   if (state.rafId) {
@@ -708,4 +1192,4 @@ window.addEventListener('beforeunload', () => {
 });
 
 fetchScores();
-setPrompt('Awaiting input.');
+setPrompt('Awaiting subject.');
