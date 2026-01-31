@@ -36,7 +36,7 @@ function log(category, message, data = null) {
 const CONFIG = {
   ZONE_WIDTH_RATIO: 0.45,          // Larger zone for easier compliance
   ZONE_HEIGHT_RATIO: 0.5,
-  SMILE_THRESHOLD: 1.5,            // Lower = easier to satisfy
+  SMILE_THRESHOLD: 0.9,            // Lower = easier to satisfy (was 1.5)
   EYE_OPENNESS_THRESHOLD: 0.012,   // Lower = less sensitive to blinks
   MOVEMENT_THRESHOLD: 0.015,
   FACE_LOST_MS: 2500,              // More time before face lost fail
@@ -50,8 +50,8 @@ const CONFIG = {
   MAX_SCORE_MS: 600000,
   POLICY_CHANGE_MIN_MS: 20000,     // First policy change after 20s
   POLICY_CHANGE_MAX_MS: 35000,
-  ZONE_DRIFT_SPEED: 0.0002,        // Slower drift
-  ZONE_DRIFT_MAX: 0.06,
+  ZONE_DRIFT_SPEED: 0.0004,        // Faster drift (was 0.0002)
+  ZONE_DRIFT_MAX: 0.12,            // Larger drift range (was 0.06)
   // Loading and countdown
   LOADING_MIN_MS: 1500,            // Minimum loading time to show message
   COUNTDOWN_SECONDS: 3,            // Countdown before calibration starts
@@ -434,6 +434,17 @@ const MESSAGES = {
   ]
 };
 
+// Specific failure reason explanations (shown to user)
+const FAILURE_REASONS = {
+  face_lost: 'Your face left the camera view.',
+  eye_drift_exceeded: 'Your eyes drifted outside the zone too often.',
+  gaze_away_limit: 'You looked away from the zone for too long.',
+  smile_drift_exceeded: 'Your expression was not maintained.',
+  liveness_drift_exceeded: 'You were too still - some movement is required.',
+  eyes_closed_limit: 'Your eyes were closed for too long.',
+  blink_drift_exceeded: 'No blinks detected - natural blinking is required.'
+};
+
 // Failure messages by category
 const FAILURE_MESSAGES = {
   gaze: [
@@ -604,7 +615,7 @@ function updateZoneDrift(dt) {
   const maxDrift = CONFIG.ZONE_DRIFT_MAX;
 
   state.zoneDriftX += speed * state.zoneDriftDirX;
-  state.zoneDriftY += speed * state.zoneDriftDirY * 0.7;
+  state.zoneDriftY += speed * state.zoneDriftDirY;  // Equal to X (was 0.7)
 
   if (Math.abs(state.zoneDriftX) > maxDrift) {
     state.zoneDriftDirX *= -1;
@@ -1340,7 +1351,12 @@ function failRun(message, reason = 'unknown') {
 
   // Cold, neutral failure message per spec
   const terminalMessage = getRandomMessage('terminal');
-  setPrompt(message + ' ' + terminalMessage);
+  // Include specific reason so user knows why they failed
+  const specificReason = FAILURE_REASONS[reason] || '';
+  const fullMessage = specificReason
+    ? `${message} (${specificReason}) ${terminalMessage}`
+    : `${message} ${terminalMessage}`;
+  setPrompt(fullMessage);
 
   stopVideoStream();
 
