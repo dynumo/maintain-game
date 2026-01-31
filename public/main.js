@@ -1005,33 +1005,65 @@ async function startGame() {
   showLoading('Warming up detection...');
   setStatus('Preparing...');
 
+  // Log video track information
+  if (video.srcObject) {
+    const videoTrack = video.srcObject.getVideoTracks()[0];
+    if (videoTrack) {
+      const settings = videoTrack.getSettings();
+      log('WEBCAM', 'Video track settings', {
+        width: settings.width,
+        height: settings.height,
+        frameRate: settings.frameRate,
+        facingMode: settings.facingMode,
+        deviceId: settings.deviceId?.substring(0, 8) + '...'
+      });
+    }
+  }
+
   // Draw a test frame to canvas to verify video is working
   const testCtx = canvas.getContext('2d');
   testCtx.drawImage(video, 0, 0, canvas.width, canvas.height);
   const testImageData = testCtx.getImageData(0, 0, 10, 10);
   const hasPixelData = testImageData.data.some(v => v > 0);
+  const avgBrightness = testImageData.data.reduce((sum, v, i) => i % 4 !== 3 ? sum + v : sum, 0) / (10 * 10 * 3);
   log('WEBCAM', 'Video frame test', {
     hasPixelData,
+    avgBrightness: avgBrightness.toFixed(1),
     samplePixels: Array.from(testImageData.data.slice(0, 16))
   });
-  testCtx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Try warmup detection multiple times
+  if (!hasPixelData || avgBrightness < 5) {
+    log('ERROR', 'Video appears to be black or empty!');
+    showLoading('Camera not working - check permissions');
+    await new Promise(r => setTimeout(r, 2000));
+  }
+
+  // Keep test frame visible so user can see what camera sees
+  // Don't clear - leave it on screen during warmup
+
+  // Try warmup detection multiple times with both flipHorizontal settings
   let warmupFaces = [];
+  let useFlipHorizontal = false;
+
   for (let attempt = 1; attempt <= 5; attempt++) {
     try {
-      log('DETECTOR', `Warmup detection attempt ${attempt}/5...`);
+      // Alternate between flip settings
+      const flip = attempt <= 2 ? false : attempt <= 4 ? true : false;
+      log('DETECTOR', `Warmup detection attempt ${attempt}/5 (flip=${flip})...`);
       const warmupStart = performance.now();
-      warmupFaces = await state.detector.estimateFaces(video, { flipHorizontal: false });
+      warmupFaces = await state.detector.estimateFaces(video, { flipHorizontal: flip });
       const warmupTime = performance.now() - warmupStart;
       log('DETECTOR', `Warmup attempt ${attempt} complete in ${warmupTime.toFixed(0)}ms`, {
-        facesFound: warmupFaces.length
+        facesFound: warmupFaces.length,
+        flipHorizontal: flip
       });
 
       if (warmupFaces.length > 0) {
+        useFlipHorizontal = flip;
         log('DETECTOR', 'Face found during warmup!', {
           box: warmupFaces[0].box,
-          keypointsCount: warmupFaces[0].keypoints?.length
+          keypointsCount: warmupFaces[0].keypoints?.length,
+          flipHorizontal: flip
         });
         break;
       }
@@ -1043,9 +1075,14 @@ async function startGame() {
     }
   }
 
+  // Store the flip setting that worked
+  state.useFlipHorizontal = useFlipHorizontal;
+  testCtx.clearRect(0, 0, canvas.width, canvas.height);
+
   if (warmupFaces.length === 0) {
     log('WARNING', 'No face detected during warmup after 5 attempts');
     log('WARNING', 'Check: Is your face visible in the camera? Is lighting adequate?');
+    log('WARNING', 'The video frame was drawn to canvas - can you see yourself?');
     showLoading('No face detected - check camera');
     setPrompt('Position your face in the camera view.');
     await new Promise(r => setTimeout(r, 2000));
@@ -1238,7 +1275,7 @@ async function loop(now) {
 
   let faces;
   try {
-    faces = await state.detector.estimateFaces(video, { flipHorizontal: false });
+    faces = await state.detector.estimateFaces(video, { flipHorizontal: state.useFlipHorizontal || false });
     state.faceDetectionCount++;
   } catch (err) {
     log('ERROR', 'Face detection error', { name: err.name, message: err.message });
