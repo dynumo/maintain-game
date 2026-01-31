@@ -1,9 +1,10 @@
-const CACHE_NAME = 'maintain-game-v1';
+const CACHE_NAME = 'maintain-game-v2';
 const urlsToCache = [
   '/',
   '/index.html',
   '/styles.css',
   '/main.js',
+  '/manifest.json',
   '/icon-192x192.png',
   '/icon-512x512.png',
   '/apple-touch-icon.png',
