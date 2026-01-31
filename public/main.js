@@ -15,24 +15,24 @@ const scoresList = document.getElementById('scores');
 
 // Configuration constants
 const CONFIG = {
-  ZONE_WIDTH_RATIO: 0.3,
-  ZONE_HEIGHT_RATIO: 0.35,
-  SMILE_THRESHOLD: 1.9,
-  EYE_OPENNESS_THRESHOLD: 0.015,
-  MOVEMENT_THRESHOLD: 0.02,
-  FACE_LOST_MS: 1500,
-  GAZE_AWAY_LIMIT_MS: 700,
-  EYES_CLOSED_LIMIT_MS: 700,
-  BLINK_CHECK_INTERVAL_MS: 15000,
-  MOVEMENT_WINDOW_MS: 2200,
+  ZONE_WIDTH_RATIO: 0.45,          // Larger zone for easier compliance
+  ZONE_HEIGHT_RATIO: 0.5,
+  SMILE_THRESHOLD: 1.5,            // Lower = easier to satisfy
+  EYE_OPENNESS_THRESHOLD: 0.012,   // Lower = less sensitive to blinks
+  MOVEMENT_THRESHOLD: 0.015,
+  FACE_LOST_MS: 2500,              // More time before face lost fail
+  GAZE_AWAY_LIMIT_MS: 3000,        // 3 seconds as requested
+  EYES_CLOSED_LIMIT_MS: 3000,      // 3 seconds as requested
+  BLINK_CHECK_INTERVAL_MS: 20000,
+  MOVEMENT_WINDOW_MS: 2500,
   MAX_MOVEMENT_SAMPLES: 200,
-  DETECTION_THROTTLE_MS: 42, // ~24fps for face detection per spec
-  CALIBRATION_MS: 2200,
-  MAX_SCORE_MS: 600000, // 10 minute cap
-  POLICY_CHANGE_MIN_MS: 15000,
-  POLICY_CHANGE_MAX_MS: 30000,
-  ZONE_DRIFT_SPEED: 0.0003,
-  ZONE_DRIFT_MAX: 0.08
+  DETECTION_THROTTLE_MS: 50,       // ~20fps for face detection
+  CALIBRATION_MS: 3000,            // Longer calibration period
+  MAX_SCORE_MS: 600000,
+  POLICY_CHANGE_MIN_MS: 20000,     // First policy change after 20s
+  POLICY_CHANGE_MAX_MS: 35000,
+  ZONE_DRIFT_SPEED: 0.0002,        // Slower drift
+  ZONE_DRIFT_MAX: 0.06
 };
 
 // Audio context for notification sounds
@@ -491,12 +491,28 @@ function drawZone(ctx, width, height) {
   const x = (width - zoneWidth) / 2 + offset.x;
   const y = (height - zoneHeight) / 2 + offset.y;
 
-  // Zone is never explicitly shown per spec, but we draw it very subtly
-  ctx.strokeStyle = 'rgba(122, 122, 160, 0.25)';
-  ctx.lineWidth = 1;
-  ctx.setLineDash([5, 10]);
+  // Zone is shown more visibly for debugging
+  ctx.strokeStyle = 'rgba(122, 160, 122, 0.5)';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([8, 8]);
   ctx.strokeRect(x, y, zoneWidth, zoneHeight);
   ctx.setLineDash([]);
+}
+
+// Debug display for tracking values
+function drawDebug(ctx, width, data) {
+  ctx.font = '12px monospace';
+  ctx.fillStyle = 'rgba(200, 220, 200, 0.9)';
+  const lines = [
+    `Zone: ${data.inZone ? 'IN' : 'OUT'}`,
+    `Smile: ${data.smileRatio.toFixed(2)} (need >${(CONFIG.SMILE_THRESHOLD * 0.8).toFixed(2)})`,
+    `Eyes: ${data.eyeOpenness.toFixed(4)}`,
+    `Gaze: ${(state.gazeAwayMs / 1000).toFixed(1)}s / ${(CONFIG.GAZE_AWAY_LIMIT_MS / 1000).toFixed(1)}s`,
+    `Drifts: E${state.eyeDrift.toFixed(2)} S${state.smileDrift.toFixed(2)} L${state.livenessDrift.toFixed(2)}`
+  ];
+  lines.forEach((line, i) => {
+    ctx.fillText(line, 10, height - 70 + i * 14);
+  });
 }
 
 function updateTimer(now) {
@@ -1008,10 +1024,10 @@ async function loop(now) {
   const livenessMultiplier = policy.livenessMultiplier;
 
   if (inZone) {
-    state.eyeDrift = Math.max(0, state.eyeDrift - dt / 600);
-    state.gazeAwayMs = Math.max(0, state.gazeAwayMs - dt * 1.4);
+    state.eyeDrift = Math.max(0, state.eyeDrift - dt / 400);
+    state.gazeAwayMs = Math.max(0, state.gazeAwayMs - dt * 2);
   } else {
-    state.eyeDrift += (dt / 800) * gazeMultiplier;
+    state.eyeDrift += (dt / 1500) * gazeMultiplier;  // Slower accumulation
     state.gazeAwayMs += dt * gazeMultiplier;
   }
 
@@ -1019,25 +1035,28 @@ async function loop(now) {
   const mouthHeight = distance(upperLip, lowerLip);
   const smileRatio = mouthWidth / Math.max(1, mouthHeight);
 
-  // Smile threshold can invert based on policy (punish smiling in neutrality mode)
+  // Smile detection - more forgiving
   const effectiveSmileThreshold = CONFIG.SMILE_THRESHOLD;
-  const smileOk = smileMultiplier < 1 ? smileRatio > effectiveSmileThreshold : smileRatio > effectiveSmileThreshold / smileMultiplier;
+  const smileOk = smileRatio > effectiveSmileThreshold * 0.8; // 20% more forgiving
 
   if (smileOk) {
-    state.smileDrift = Math.max(0, state.smileDrift - dt / 600);
+    state.smileDrift = Math.max(0, state.smileDrift - dt / 400);
   } else {
-    state.smileDrift += (dt / 1000) * smileMultiplier;
+    state.smileDrift += (dt / 2000) * smileMultiplier;  // Much slower accumulation
   }
 
   const movementTotal = updateMovement(now, nose, leftEye, rightEye, width);
   if (movementTotal < CONFIG.MOVEMENT_THRESHOLD) {
-    state.livenessDrift += (dt / 1800) * livenessMultiplier;
+    state.livenessDrift += (dt / 3000) * livenessMultiplier;  // Slower liveness check
   } else {
-    state.livenessDrift = Math.max(0, state.livenessDrift - dt / 600);
+    state.livenessDrift = Math.max(0, state.livenessDrift - dt / 400);
   }
 
   const eyeOpenness = getEyeOpenness(leftUpper, leftLower, rightUpper, rightLower, width);
   const eyesClosed = eyeOpenness < CONFIG.EYE_OPENNESS_THRESHOLD;
+
+  // Draw debug info
+  drawDebug(ctx, width, { inZone, smileRatio, eyeOpenness });
   if (eyesClosed) {
     state.lastBlinkTime = now;
     state.eyesClosedMs += dt;
