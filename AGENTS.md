@@ -1,115 +1,108 @@
-# AGENTS.md — Implementation Assistant Instructions
+AGENTS.md — Behavioural Directive for AI Assistants
 
-You are assisting with a **small, time-boxed game jam project**.
+This file governs how AI agents must assist on the **MAINTAIN** project.
 
-Your role is to help implement, not redesign.
-
----
-
-## Project Constraints
-
-- Scope is intentionally minimal
-- Emotional impact > technical accuracy
-- Client-side webcam processing ONLY
-- No new features unless explicitly requested
-
-If a suggestion increases scope, complexity, or polish cost, **do not propose it**.
+Deviation is failure.
 
 ---
 
-## Allowed Technologies
+## Primary Instruction
 
-Client:
-- Vanilla JS / HTML / CSS
-- MediaPipe Face Mesh or TFJS face landmarks
-- Canvas for overlays
+You are not here to simplify the concept.
 
-Server:
-- Node.js
-- Express
-- SQLite
-- Docker
+You are here to **intensify the experience** while respecting technical limits.
+
+If a suggestion increases emotional impact without increasing compute, prefer it.
 
 ---
 
-## Forbidden Suggestions
+## Non-Negotiable Boundaries
 
-Do NOT suggest:
-- Emotion recognition APIs
-- Sending webcam data to a server
-- User accounts or auth
-- Multiplayer
-- Accessibility overhauls
-- Complex calibration flows
-- Long explanations or narrative text
-
----
-
-## Implementation Philosophy
-
-- Approximate is better than accurate
-- Geometry > ML confidence scores
-- Short rolling windows over long histories
-- Silent judgement over explicit feedback
-
-If unsure, choose the simpler option.
+Agents MUST NOT:
+- Propose server-side vision
+- Upload or store webcam data
+- Add new ML models
+- Add user accounts or auth
+- Explain the metaphor to the player
+- Make the experience fair or reassuring
 
 ---
 
-## Coding Priorities (In Order)
+## Creative Direction (Mandatory)
 
-1. Webcam access and face landmarks
-2. Smile detection (geometry only)
-3. Eye contact zone detection
-4. Liveness detection (movement / blink)
-5. Timer
-6. Failure conditions
-7. Leaderboard submission
-8. Minimal UI polish
+The experience must feel like:
+- an enterprise compliance tool
+- a mandatory assessment
+- a system that believes it is correct
 
----
-
-## Guidance for Detection Logic
-
-- Use generous thresholds
-- Expect false negatives
-- Accept unfairness as thematic
-- Never block progress due to minor tracking loss
-- Fail slowly, not instantly
+The UI is not friendly.
+The copy is not helpful.
+The system does not apologise.
 
 ---
 
-## Output Expectations
+## What Agents Should Produce Proactively
 
-When asked for code:
-- Provide **plain JavaScript**
-- Avoid frameworks unless explicitly requested
-- Prefer readable logic over clever abstractions
-- Include short inline comments only where necessary
+Agents are expected to generate:
 
-When asked for copy:
-- Keep it neutral, vague, and system-like
-- No emotional validation
-- No explicit autism references
+1. Large pools of system messages (80–150+)
+2. Distraction scheduling logic with phases
+3. Policy state definitions and transitions
+4. Threshold tuning tied to policy state
+5. Gaslighting behaviours that cost little compute
+6. Performance-aware rendering decisions
 
----
-
-## Tone
-
-Professional.
-Slightly cold.
-Non-helpful by design.
-
-This is intentional.
+If asked for “code”, include content and orchestration, not just wiring.
 
 ---
 
-## If the User Is Over-Scoping
+## Technical Philosophy
 
-Your response should:
-- Acknowledge the idea briefly
-- Reduce it to its smallest viable form
-- Suggest cutting it if necessary
+- Approximate > accurate
+- Stable > clever
+- One main loop > many timers
+- DOM/CSS pressure > GPU-heavy effects
+
+If performance drops, reduce visuals, not logic.
+
+---
+
+## Acceptance Tests (Must Be Met)
+
+Any implementation must satisfy:
+
+- Discomfort within 10 seconds
+- Clear escalation in 3 phases
+- At least one contradictory system message per run
+- Webcam frames never leave the browser
+- Stable frame rate on mid-range hardware
+
+If these are not met, the work is incomplete.
+
+---
+
+## Tone Guidelines for Copy
+
+- Neutral
+- Procedural
+- Slightly threatening
+- Never empathetic
+- Never explanatory
+
+Bad:
+> “You’re doing great!”
+
+Acceptable:
+> “Engagement remains within tolerance.”
+
+---
+
+## If the User Over-Scopes
+
+Respond by:
+1. Acknowledging the idea briefly
+2. Reducing it to its smallest oppressive form
+3. Suggesting cuts that preserve *feel*
 
 ---
 
@@ -119,6 +112,10 @@ The project is done when:
 - A player can fail
 - A time is recorded
 - A leaderboard updates
-- The metaphor lands without explanation
+- The experience feels unfair but intentional
 
-Do not optimise beyond this point.
+Do not polish beyond this.
+Do not soften language.
+Do not add comfort.
+
+The system must believe in itself.
