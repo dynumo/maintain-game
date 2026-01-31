@@ -844,15 +844,14 @@ function resetMetrics(now) {
 }
 
 async function initDetector() {
-  log('DETECTOR', 'Initializing TensorFlow backend...');
-  await tf.setBackend('webgl');
-  await tf.ready();
-  log('DETECTOR', 'TensorFlow ready, creating face detector...');
+  log('DETECTOR', 'Creating MediaPipe face mesh detector...');
   return faceLandmarksDetection.createDetector(
     faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh,
     {
-      runtime: 'tfjs',
-      refineLandmarks: true
+      runtime: 'mediapipe',
+      solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh',
+      refineLandmarks: true,
+      maxFaces: 1
     }
   );
 }
