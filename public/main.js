@@ -66,7 +66,7 @@ const CONFIG = {
   MESH_COLOR: 'rgba(122, 160, 122, 0.7)',  // Greenish - more visible (was 0.4)
   MESH_LINE_WIDTH: 0.5,
   // Smile feedback threshold (0-100 scale for display, ratio internally)
-  SMILE_DISPLAY_THRESHOLD: 50      // Show "Keep smiling!" when below this
+  SMILE_DISPLAY_THRESHOLD: 100     // Show "Keep smiling!" when below this percentage
 };
 
 // Face mesh triangulation indices (from TensorFlow.js face-landmarks-detection)
@@ -1104,8 +1104,8 @@ function scheduleDistractions() {
   }
 
   // Interval decreases with phase and distraction level
-  const baseInterval = state.escalationPhase === 3 ? 1800 : state.escalationPhase === 2 ? 2800 : 4000;
-  const interval = Math.max(800, baseInterval - state.distractionLevel * 150);
+  const baseInterval = state.escalationPhase === 3 ? 2500 : state.escalationPhase === 2 ? 3500 : 5000;
+  const interval = Math.max(1500, baseInterval - state.distractionLevel * 100);
   state.distractionLevel = Math.min(15, state.distractionLevel + 1);
 
   state.distractions = setTimeout(() => {
