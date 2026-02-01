@@ -55,11 +55,25 @@ app.get('/', (req, res) => {
       .replace('href="styles.css"', `href="styles.css?v=${APP_VERSION}"`)
       .replace('src="main.js"', `src="main.js?v=${APP_VERSION}"`)
       .replace("register('/service-worker.js')", `register('/service-worker.js?v=${APP_VERSION}')`);
+    // Set no-cache headers for HTML
+    res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
     res.send(versionedHtml);
   });
 });
 
-app.use(express.static(path.join(__dirname, 'public')));
+// Serve static files with no-cache headers to ensure fresh content
+app.use(express.static(path.join(__dirname, 'public'), {
+  setHeaders: (res, filePath) => {
+    // Set no-cache headers for JS, CSS, and HTML files
+    if (filePath.endsWith('.js') || filePath.endsWith('.css') || filePath.endsWith('.html')) {
+      res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.set('Pragma', 'no-cache');
+      res.set('Expires', '0');
+    }
+  }
+}));
 
 const lastSubmitByIp = new Map();
 
