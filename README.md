@@ -2,6 +2,8 @@
 
 A short browser game where you must maintain eye contact, keep smiling, and remain visibly present while the system watches.
 
+Created by [Adam McBride](https://www.adammcbride.co.uk/) for the **2026 Global Game Jam** at [Farset Labs](https://www.farsetlabs.org.uk/) in Belfast.
+
 ## Run locally
 
 ```bash
