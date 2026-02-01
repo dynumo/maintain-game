@@ -43,7 +43,7 @@ const CONFIG = {
   ZONE_WIDTH_RATIO: 0.35,          // Smaller zone for more challenge
   ZONE_HEIGHT_RATIO: 0.4,
   SMILE_THRESHOLD: 0.9,            // Lower = easier to satisfy (was 1.5)
-  EYE_OPENNESS_THRESHOLD: 0.012,   // Lower = less sensitive to blinks
+  EYE_OPENNESS_THRESHOLD: 0.006,   // Lower = less sensitive to blinks
   MOVEMENT_THRESHOLD: 0.015,
   FACE_LOST_MS: 2500,              // More time before face lost fail
   GAZE_AWAY_LIMIT_MS: 1000,        // 1 second gaze allowance

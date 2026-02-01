@@ -50,6 +50,13 @@ app.get('/', (req, res) => {
       res.status(500).send('Error loading page');
       return;
     }
+
+    // Set no-cache headers to ensure we always get the latest version injection
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+    res.set('Surrogate-Control', 'no-store');
+
     // Inject version query params into CSS and JS references
     const versionedHtml = html
       .replace('href="styles.css"', `href="styles.css?v=${APP_VERSION}"`)
