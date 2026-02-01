@@ -1,6 +1,6 @@
 {
   "name": "maintain-game",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Maintain eye contact, smile, and liveness under silent judgment.",
   "main": "server.js",
