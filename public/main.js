@@ -790,18 +790,34 @@ function updateZoneDrift(dt) {
   }
 }
 
-function drawZone(ctx, width, height) {
+function getZoneRect(width, height) {
   const offset = getZoneOffset();
-  const zoneWidth = width * CONFIG.ZONE_WIDTH_RATIO;
-  const zoneHeight = height * CONFIG.ZONE_HEIGHT_RATIO;
+  const isPortrait = height > width;
+
+  let zoneWidth = width * CONFIG.ZONE_WIDTH_RATIO;
+  let zoneHeight;
+
+  if (isPortrait) {
+    // Square box in portrait
+    zoneHeight = zoneWidth;
+  } else {
+    zoneHeight = height * CONFIG.ZONE_HEIGHT_RATIO;
+  }
+
   const x = (width - zoneWidth) / 2 + offset.x;
   const y = (height - zoneHeight) / 2 + offset.y;
+
+  return { x, y, width: zoneWidth, height: zoneHeight };
+}
+
+function drawZone(ctx, width, height) {
+  const rect = getZoneRect(width, height);
 
   // Zone is shown more visibly for debugging
   ctx.strokeStyle = 'rgba(122, 160, 122, 0.5)';
   ctx.lineWidth = 2;
   ctx.setLineDash([8, 8]);
-  ctx.strokeRect(x, y, zoneWidth, zoneHeight);
+  ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
   ctx.setLineDash([]);
 }
 
@@ -1649,11 +1665,7 @@ async function loop(now) {
   const height = canvas.height;
 
   // Get zone with drift offset
-  const offset = getZoneOffset();
-  const zoneWidth = width * CONFIG.ZONE_WIDTH_RATIO;
-  const zoneHeight = height * CONFIG.ZONE_HEIGHT_RATIO;
-  const zoneX = (width - zoneWidth) / 2 + offset.x;
-  const zoneY = (height - zoneHeight) / 2 + offset.y;
+  const zoneRect = getZoneRect(width, height);
 
   const eyeCenter = {
     x: (leftEye.x + rightEye.x) / 2,
@@ -1661,10 +1673,10 @@ async function loop(now) {
   };
 
   const inZone =
-    eyeCenter.x > zoneX &&
-    eyeCenter.x < zoneX + zoneWidth &&
-    eyeCenter.y > zoneY &&
-    eyeCenter.y < zoneY + zoneHeight;
+    eyeCenter.x > zoneRect.x &&
+    eyeCenter.x < zoneRect.x + zoneRect.width &&
+    eyeCenter.y > zoneRect.y &&
+    eyeCenter.y < zoneRect.y + zoneRect.height;
 
   // Apply policy multipliers
   const policy = state.currentPolicy || POLICIES.BASELINE_COMPLIANCE;
