@@ -1,3 +1,5 @@
 node_modules/
 data/leaderboard.db
+data/leaderboard.db-shm
+data/leaderboard.db-wal
 .DS_Store

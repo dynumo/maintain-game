@@ -25,6 +25,9 @@ if (!fs.existsSync(DATA_DIR)) {
 const db = new sqlite3.Database(DB_PATH);
 
 db.serialize(() => {
+  // Enable WAL mode for better concurrency and performance
+  db.run('PRAGMA journal_mode = WAL');
+
   db.run(
     `CREATE TABLE IF NOT EXISTS scores (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -33,6 +36,9 @@ db.serialize(() => {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`
   );
+
+  // Add index for leaderboard performance
+  db.run('CREATE INDEX IF NOT EXISTS idx_scores_time_created ON scores(time_ms DESC, created_at ASC)');
 });
 
 app.use(express.json());
@@ -106,6 +112,11 @@ app.post('/api/scores', (req, res) => {
 
   const sanitizedName = name.replace(/[\n\r\t]/g, ' ');
   lastSubmitByIp.set(ip, now);
+
+  // Clear IP from map after rate limit expires to prevent memory leak
+  setTimeout(() => {
+    lastSubmitByIp.delete(ip);
+  }, RATE_LIMIT_MS);
 
   db.run(
     'INSERT INTO scores (name, time_ms) VALUES (?, ?)',
