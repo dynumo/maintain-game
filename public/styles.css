@@ -93,31 +93,17 @@ body {
   font-weight: 500;
 }
 
-/* Media controls container (bottom left to avoid leaderboard overlap) */
+/* Media controls in sidebar */
 .media-controls {
-  position: fixed;
-  bottom: 12px;
-  left: 12px;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-  z-index: 1000;
-  background: rgba(0, 0, 0, 0.6);
-  padding: 6px 10px;
-  border-radius: 8px;
-  border: 1px solid rgba(200, 200, 200, 0.2);
 }
 
 /* Hide music controls when not available */
 .music-control.hidden {
   display: none;
-}
-
-/* Simpler styling when only fullscreen button is visible */
-.media-controls:has(.music-control.hidden) {
-  padding: 4px;
-  background: transparent;
-  border: none;
 }
 
 .media-btn {
@@ -193,33 +179,6 @@ body {
 .volume-slider:focus {
   outline: 2px solid #c49a4a;
   outline-offset: 2px;
-}
-
-/* Legacy fullscreen button (now part of media controls) */
-.fullscreen-btn {
-  background: rgba(0, 0, 0, 0.5);
-  border: 1px solid rgba(200, 200, 200, 0.3);
-  color: #e8eef6;
-  font-size: 1.25rem;
-  width: 36px;
-  height: 36px;
-  border-radius: 6px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-  padding: 0;
-}
-
-.fullscreen-btn:hover {
-  background: rgba(0, 255, 0, 0.2);
-  border-color: #00ff00;
-  transform: scale(1.05);
-}
-
-.fullscreen-btn:active {
-  transform: scale(0.95);
 }
 
 /* Main content: Landscape layout */
