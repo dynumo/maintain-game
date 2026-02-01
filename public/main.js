@@ -58,6 +58,7 @@ const CONFIG = {
   POLICY_CHANGE_MAX_MS: 35000,
   ZONE_DRIFT_SPEED: 0.0006,        // Faster drift for more challenge
   ZONE_DRIFT_MAX: 0.15,            // Larger drift range for more movement
+  MAX_OUT_OF_ZONE_COUNT: 20,       // Max times allowed to leave zone
   // Loading and countdown
   LOADING_MIN_MS: 1500,            // Minimum loading time to show message
   COUNTDOWN_SECONDS: 3,            // Countdown before calibration starts
@@ -598,7 +599,8 @@ const FAILURE_REASONS = {
   smile_drift_exceeded: 'Your expression was not maintained.',
   liveness_drift_exceeded: 'You were too still - some movement is required.',
   eyes_closed_limit: 'Your eyes were closed for too long.',
-  blink_drift_exceeded: 'No blinks detected - natural blinking is required.'
+  blink_drift_exceeded: 'No blinks detected - natural blinking is required.',
+  out_of_zone_count_exceeded: 'You left the zone too many times.'
 };
 
 // Failure messages by category
@@ -889,6 +891,10 @@ function updateDebugPanel(data) {
       <span class="debug-value ${getClass(gazePercent)}">${(state.gazeAwayMs / 1000).toFixed(1)}s / ${(CONFIG.GAZE_AWAY_LIMIT_MS / 1000).toFixed(1)}s</span>
     </div>
     <div class="debug-line">
+      <span class="debug-label">Zone Exits:</span>
+      <span class="debug-value ${state.outOfZoneCount > CONFIG.MAX_OUT_OF_ZONE_COUNT * 0.75 ? 'danger' : ''}">${state.outOfZoneCount} / ${CONFIG.MAX_OUT_OF_ZONE_COUNT}</span>
+    </div>
+    <div class="debug-line">
       <span class="debug-label">Eye Drift:</span>
       <span class="debug-value ${getClass(eyeDriftPercent)}">${eyeDriftPercent.toFixed(0)}%</span>
     </div>
@@ -1140,6 +1146,8 @@ function resetMetrics(now) {
   state.blinkDrift = 0;
   state.lastBlinkTime = now;
   state.gazeAwayMs = 0;
+  state.outOfZoneCount = 0;
+  state.wasInZone = true;
   state.eyesClosedMs = 0;
   state.movementSamples = [];
   state.lastPoints = null;
@@ -1678,6 +1686,12 @@ async function loop(now) {
     eyeCenter.y > zoneRect.y &&
     eyeCenter.y < zoneRect.y + zoneRect.height;
 
+  if (!inZone && state.wasInZone) {
+    state.outOfZoneCount++;
+    log('METRICS', `Out of zone count: ${state.outOfZoneCount}`);
+  }
+  state.wasInZone = inZone;
+
   // Apply policy multipliers
   const policy = state.currentPolicy || POLICIES.BASELINE_COMPLIANCE;
   const gazeMultiplier = policy.gazeMultiplier;
@@ -1764,6 +1778,10 @@ async function loop(now) {
 
     if (state.eyeDrift > 1) {
       failRun(getFailureMessage('gaze'), 'eye_drift_exceeded');
+      return;
+    }
+    if (state.outOfZoneCount > CONFIG.MAX_OUT_OF_ZONE_COUNT) {
+      failRun(getFailureMessage('gaze'), 'out_of_zone_count_exceeded');
       return;
     }
     if (state.gazeAwayMs > gazeLimit) {
