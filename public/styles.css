@@ -93,11 +93,11 @@ body {
   font-weight: 500;
 }
 
-/* Media controls container (bottom right) */
+/* Media controls container (bottom left to avoid leaderboard overlap) */
 .media-controls {
   position: fixed;
   bottom: 12px;
-  right: 12px;
+  left: 12px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1019,4 +1019,29 @@ li strong {
   li {
     font-size: 0.85rem;
   }
+}
+
+/* Site footer */
+.site-footer {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 12px 8px;
+  font-size: 0.75rem;
+  color: #6a7a8a;
+  letter-spacing: 0.02em;
+}
+
+.site-footer a {
+  color: #8a9aac;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.site-footer a:hover {
+  color: #c49a4a;
+}
+
+.site-footer a:focus {
+  outline: 1px solid #c49a4a;
+  outline-offset: 2px;
 }

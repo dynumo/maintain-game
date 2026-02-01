@@ -40,13 +40,13 @@ function log(category, message, data = null) {
 
 // Configuration constants
 const CONFIG = {
-  ZONE_WIDTH_RATIO: 0.45,          // Larger zone for easier compliance
-  ZONE_HEIGHT_RATIO: 0.5,
+  ZONE_WIDTH_RATIO: 0.35,          // Smaller zone for more challenge
+  ZONE_HEIGHT_RATIO: 0.4,
   SMILE_THRESHOLD: 0.9,            // Lower = easier to satisfy (was 1.5)
   EYE_OPENNESS_THRESHOLD: 0.012,   // Lower = less sensitive to blinks
   MOVEMENT_THRESHOLD: 0.015,
   FACE_LOST_MS: 2500,              // More time before face lost fail
-  GAZE_AWAY_LIMIT_MS: 2000,        // 2 seconds - reduced from 3
+  GAZE_AWAY_LIMIT_MS: 1000,        // 1 second gaze allowance
   EYES_CLOSED_LIMIT_MS: 3000,      // 3 seconds as requested
   BLINK_CHECK_INTERVAL_MS: 20000,
   MOVEMENT_WINDOW_MS: 2500,
@@ -56,8 +56,8 @@ const CONFIG = {
   MAX_SCORE_MS: 600000,
   POLICY_CHANGE_MIN_MS: 20000,     // First policy change after 20s
   POLICY_CHANGE_MAX_MS: 35000,
-  ZONE_DRIFT_SPEED: 0.0004,        // Faster drift (was 0.0002)
-  ZONE_DRIFT_MAX: 0.12,            // Larger drift range (was 0.06)
+  ZONE_DRIFT_SPEED: 0.0006,        // Faster drift for more challenge
+  ZONE_DRIFT_MAX: 0.15,            // Larger drift range for more movement
   // Loading and countdown
   LOADING_MIN_MS: 1500,            // Minimum loading time to show message
   COUNTDOWN_SECONDS: 3,            // Countdown before calibration starts
@@ -766,8 +766,9 @@ function getZoneOffset() {
 }
 
 function updateZoneDrift(dt) {
-  // Subtle zone drift per spec
-  const speed = CONFIG.ZONE_DRIFT_SPEED * dt;
+  // Subtle zone drift per spec - speed increases with each phase
+  const phaseSpeedMultiplier = state.escalationPhase === 3 ? 1.6 : state.escalationPhase === 2 ? 1.3 : 1.0;
+  const speed = CONFIG.ZONE_DRIFT_SPEED * dt * phaseSpeedMultiplier;
   const maxDrift = CONFIG.ZONE_DRIFT_MAX;
 
   state.zoneDriftX += speed * state.zoneDriftDirX;
