@@ -93,11 +93,11 @@ body {
   font-weight: 500;
 }
 
-/* Media controls container (bottom right) */
+/* Media controls container (bottom left to avoid leaderboard overlap) */
 .media-controls {
   position: fixed;
   bottom: 12px;
-  right: 12px;
+  left: 12px;
   display: flex;
   align-items: center;
   gap: 8px;
