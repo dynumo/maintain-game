@@ -5,6 +5,10 @@ const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Read version from package.json for cache busting
+const packageJson = require('./package.json');
+const APP_VERSION = packageJson.version;
 const DATA_DIR = path.join(__dirname, 'data');
 const DB_PATH = path.join(DATA_DIR, 'leaderboard.db');
 const MAX_TIME_MS = 10 * 60 * 1000;
@@ -32,6 +36,29 @@ db.serialize(() => {
 });
 
 app.use(express.json());
+
+// Version API endpoint
+app.get('/api/version', (req, res) => {
+  res.json({ version: APP_VERSION });
+});
+
+// Serve index.html with version-tagged assets for cache busting
+app.get('/', (req, res) => {
+  const indexPath = path.join(__dirname, 'public', 'index.html');
+  fs.readFile(indexPath, 'utf8', (err, html) => {
+    if (err) {
+      res.status(500).send('Error loading page');
+      return;
+    }
+    // Inject version query params into CSS and JS references
+    const versionedHtml = html
+      .replace('href="styles.css"', `href="styles.css?v=${APP_VERSION}"`)
+      .replace('src="main.js"', `src="main.js?v=${APP_VERSION}"`)
+      .replace("register('/service-worker.js')", `register('/service-worker.js?v=${APP_VERSION}')`);
+    res.send(versionedHtml);
+  });
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 const lastSubmitByIp = new Map();
@@ -119,7 +146,7 @@ app.delete('/api/scores', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Maintain running on http://localhost:${PORT}`);
+  console.log(`Maintain v${APP_VERSION} running on http://localhost:${PORT}`);
   if (RESET_TOKEN) {
     console.log('Leaderboard reset endpoint enabled (DELETE /api/scores)');
   }

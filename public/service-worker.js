@@ -1,9 +1,9 @@
-const CACHE_NAME = 'maintain-game-v4';
+// Version is extracted from the service worker URL query param (set by server)
+const SW_VERSION = new URL(self.location).searchParams.get('v') || '1.0.0';
+const CACHE_NAME = `maintain-game-v${SW_VERSION}`;
+
 const urlsToCache = [
   '/',
-  '/index.html',
-  '/styles.css',
-  '/main.js',
   '/manifest.json',
   '/icon-192x192.png',
   '/icon-512x512.png',
@@ -12,12 +12,16 @@ const urlsToCache = [
   '/favicon-16x16.png'
 ];
 
+// Note: styles.css and main.js are served with version params by the server,
+// so they'll be cached with their versioned URLs automatically
+
 // Install event - cache static assets
 self.addEventListener('install', (event) => {
+  console.log(`Service worker installing: ${CACHE_NAME}`);
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
-        console.log('Opened cache');
+        console.log('Opened cache:', CACHE_NAME);
         return cache.addAll(urlsToCache);
       })
   );
